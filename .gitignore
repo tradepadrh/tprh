@@ -1,0 +1,14 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# foundry
+out/
+cache/
+broadcast/
+lib/
+
+# node / os
+node_modules/
+.DS_Store

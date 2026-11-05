@@ -482,11 +482,11 @@ th.r, td.r { text-align: right; }
           <div id="trend"><div class="empty">Loading…</div></div>
         </section>
 
-        <section class="card" id="c-trades" aria-label="Recent trades">
-          <div class="card-h"><h2>Recent trades</h2><span class="muted" style="font-size:12px" id="tx-pool"></span></div>
+        <section class="card" id="c-trades" aria-label="Buy and sell activity">
+          <div class="card-h"><h2>Buy / sell activity</h2><span class="muted" style="font-size:12px" id="tx-pool"></span></div>
           <div class="tbl-wrap trades">
             <table>
-              <thead><tr><th>Time</th><th class="r">Amount</th><th class="r">Value</th></tr></thead>
+              <thead><tr><th>Window</th><th class="r">Trades</th><th class="r">Volume</th></tr></thead>
               <tbody id="txs"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
             </table>
           </div>
@@ -498,7 +498,7 @@ th.r, td.r { text-align: right; }
   </div>
 </div>
 
-<script src="/config.js"></script>
+<script src="config.js"></script>
 <script>
 (() => {
 "use strict";
@@ -512,6 +512,7 @@ const CONFIG = {
   ROUTER: "",              // set after deploying, or via Settings
   DEFAULT_FEE_BPS: 50,
   TABLE_ROWS: 20,
+  HAS_KEY: false,          // set by the server when DEXPAPRIKA_API_KEY is configured
   ...(window.TRADEPAD_CONFIG || {}),   // runtime overrides served by the host (/config.js)
 };
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -557,7 +558,7 @@ const ABI = {
 // ======================= STATE =======================
 const S = {
   net: CONFIG.NETWORK_HINT, sample: false,
-  pools: [], newPools: null, venue: "", tableTab: "volume", trendTab: "volume",
+  pools: [], allPools: null, newPools: null, newAt: 0, extra: [], venue: "", tableTab: "volume", trendTab: "volume",
   sel: null, interval: "1h", side: "buy", slipBps: 100n,
   router: load("router") || CONFIG.ROUTER,
   wallet: null, pons: null, prices: {}, tokens: {},
@@ -586,6 +587,7 @@ function fmtSmall(v) {
   return (v < 0 ? "-" : "") + "0.0" + String(-Number(e) - 1).split("").map(d => "₀₁₂₃₄₅₆₇₈₉"[d]).join("") + m.replace(".", "").slice(0, 4);
 }
 function fmtNum(v, d = 4) { v = Number(v); if (!isFinite(v)) return "—"; const a = Math.abs(v); if (a >= 1e6) return (v / 1e6).toFixed(2) + "M"; if (a >= 1000) return v.toLocaleString("en-US", { maximumFractionDigits: 0 }); if (a < 0.01 && v !== 0) return fmtSmall(v); return v.toLocaleString("en-US", { maximumFractionDigits: d }); }
+function fmtPrice(v) { v = Number(v); if (!isFinite(v) || v <= 0) return "—"; if (v >= 1000) return "$" + v.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 }); return fmtUsd(v); }
 const fmtPct = (v) => { v = Number(v); return isFinite(v) ? Math.abs(v).toFixed(2) + "%" : "—"; };
 const short = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
 function ago(t) { const d = (Date.now() - new Date(t).getTime()) / 1000; if (!isFinite(d)) return "—"; if (d < 60) return Math.max(1, d | 0) + "s ago"; if (d < 3600) return (d / 60 | 0) + "m ago"; if (d < 86400) return (d / 3600 | 0) + "h ago"; return (d / 86400 | 0) + "d ago"; }
@@ -596,13 +598,20 @@ const pick = (o, ...paths) => { for (const p of paths) { const v = p.split(".").
 const chipHTML = (v) => isFinite(v) ? `<span class="chip ${v >= 0 ? "up" : "down"}">${fmtPct(v)}</span>` : `<span class="muted">—</span>`;
 
 // ======================= API =======================
+// DexPaprika no longer allows direct browser calls (CORS) and removed the plain pool list.
+// TradePad talks to it through the host's /dp proxy (server.js) and uses /pools/search?detailed=true,
+// which returns pools with token symbols, prices and per-window stats in one request.
+const NET = () => S.net;
 async function api(path) {
-  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
-  try { const r = await fetch(CONFIG.API + path, { signal: ctl.signal }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
-  finally { clearTimeout(t); }
-}
-async function resolveNetwork() {
-  try { const n = await api("/networks"); const arr = Array.isArray(n) ? n : (n.networks || []); const hit = arr.find(x => /robinhood/i.test(x.id + " " + (x.display_name || ""))); if (hit) S.net = hit.id; } catch {}
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(CONFIG.API + path, { signal: ctl.signal });
+    if (!r.ok) {
+      let body = null; try { body = await r.json(); } catch {}
+      const e = new Error((body && (body.message || body.error)) || ("HTTP " + r.status)); e.status = r.status; e.body = body; throw e;
+    }
+    return await r.json();
+  } finally { clearTimeout(t); }
 }
 function splitPool(p) {
   const toks = p.tokens || [];
@@ -610,7 +619,57 @@ function splitPool(p) {
   const quote = toks.find(t => t !== base) || {};
   return { base, quote, baseIndex: toks.indexOf(base) };
 }
-// token details (price, change, liquidity), cached with limited concurrency
+// price from fdv / circulating supply (matches DexPaprika's pool price); pool price_usd is the base token's price
+function tokenPrice(t, raw, isBase) {
+  const sup = Number(t.total_supply) / 10 ** Number(t.decimals ?? 18);
+  if (Number(t.fdv) > 0 && sup > 0) return Number(t.fdv) / sup;
+  return isBase ? Number(raw.price_usd) : NaN;
+}
+const TF = ["5m", "15m", "30m", "1h", "6h", "24h"];
+function ingestToken(tk, t, raw, isBase, p) {
+  const has = t && t["24h"];
+  const price = tokenPrice(t || {}, raw, isBase);
+  if (!has && !(isBase && price > 0)) return;
+  const prev = S.tokens[tk.id];
+  if (prev && prev.tf && !has) return;                       // keep richer data
+  const pick24 = (k, fb) => { const v = Number(t?.["24h"]?.[k]); return isFinite(v) ? v : fb; };
+  const info = {
+    price: price > 0 ? price : prev?.price,
+    change: pick24("last_price_usd_change", isBase ? Number(raw.price_change_percentage_24h ?? raw.last_price_change_usd_24h) : NaN),
+    vol: pick24("volume_usd", isBase ? p.volume_usd : NaN),
+    txns: pick24("txns", isBase ? p.transactions : NaN),
+    liq: Math.max(prev?.liq || 0, isBase && isFinite(p.liquidity_usd) ? p.liquidity_usd : 0) || NaN,
+    fdv: Number(t?.fdv),
+    tf: has ? Object.fromEntries(TF.map(k => [k, t[k]])) : prev?.tf,
+  };
+  S.tokens[tk.id] = info;
+  if (price > 0) S.prices[tk.id] = price;
+}
+function normalizePool(raw) {
+  const tokens = (raw.tokens || []).map(t => ({ id: lc(t.id), symbol: t.symbol || "?", name: t.name || "", decimals: t.decimals }));
+  const p = {
+    id: raw.id, dex_id: raw.dex_id || "", dex_name: raw.dex_name || "", created_at: raw.created_at,
+    volume_usd: Number(raw.volume_usd_24h ?? raw.volume_usd), transactions: Number(raw.transactions_24h ?? raw.transactions),
+    liquidity_usd: Number(raw.liquidity_usd), price_usd: Number(raw.price_usd), tokens,
+  };
+  const { base } = splitPool(p);
+  (raw.tokens || []).forEach((t, i) => ingestToken(tokens[i], t, raw, tokens[i] === base, p));
+  if (S.prices[WETH] && !S.prices[ZERO]) S.prices[ZERO] = S.prices[WETH];
+  return p;
+}
+// one row per base token (the busiest pool wins), and drop wash-traded pools with almost no trades
+function dedupe(pools) {
+  const seen = new Set(); const out = [];
+  for (const p of pools) {
+    if (p.transactions < 25 && p.volume_usd > 250000) continue;
+    const id = lc(splitPool(p).base.id);
+    if (seen.has(id)) continue; seen.add(id); out.push(p);
+  }
+  return out;
+}
+const searchPath = (q) => `/networks/${NET()}/pools/search?detailed=true&${q}`;
+
+// token details on demand (e.g. a starred token that is not in today's list): one pool search per token
 const inflight = {}; let running = 0; const queue = [];
 function getToken(id) {
   id = lc(id);
@@ -618,67 +677,86 @@ function getToken(id) {
   if (inflight[id]) return inflight[id];
   return inflight[id] = new Promise((res) => { queue.push(async () => {
     try {
-      const t = S.sample ? sampleToken(id) : await api(`/networks/${S.net}/tokens/${id}`);
-      const d24 = pick(t, "summary.24h") || {};
-      const info = { price: Number(pick(t, "summary.price_usd", "price_usd")), change: Number(pick(d24, "last_price_usd_change", "price_change_percentage")),
-        vol: Number(pick(d24, "volume_usd", "volume")), txns: Number(pick(d24, "txns", "transactions")), liq: Number(pick(t, "summary.liquidity_usd", "liquidity_usd")), fdv: Number(pick(t, "summary.fdv", "fdv")) };
-      S.tokens[id] = info; if (info.price > 0) S.prices[id] = info.price; res(info);
+      if (S.sample) {
+        const t = sampleToken(id); const d24 = t.summary["24h"] || {};
+        S.tokens[id] = { price: t.summary.price_usd, change: d24.last_price_usd_change, vol: d24.volume_usd, txns: d24.txns, liq: t.summary.liquidity_usd, fdv: t.summary.fdv, tf: sampleTf(id) };
+        S.prices[id] = t.summary.price_usd;
+      } else {
+        const d = await api(searchPath(`token_address=${id}&order_by=volume_usd_24h&sort=desc&limit=1`));
+        const p = (d.results || []).map(normalizePool)[0];
+        if (p && !poolForToken(id)) S.extra.push(p);
+      }
+      res(S.tokens[id] || null);
     } catch { res(null); } finally { delete inflight[id]; }
   }); pump(); });
 }
-function pump() { while (running < 4 && queue.length) { running++; queue.shift()().finally(() => { running--; pump(); }); } }
+function pump() { while (running < 2 && queue.length) { running++; queue.shift()().finally(() => { running--; pump(); }); } }
 
 // ======================= MARKET DATA =======================
-async function loadPools() {
+function setLive(ok, why) {
+  $("status").dataset.s = ok ? "live" : "sample";
+  $("status-t").textContent = ok ? "Robinhood Chain · live" : "Sample data";
+  $("status").title = ok ? (CONFIG.HAS_KEY ? "Live DexPaprika data (API key)." : "Live DexPaprika data (keyless: hourly chart, last 24h).") : why;
+}
+async function loadPools(silent) {
   try {
-    const d = await api(`/networks/${S.net}/pools?limit=50&page=0&order_by=volume_usd&sort=desc`);
-    S.pools = d.pools || d.data || []; S.sample = false;
-    $("status").dataset.s = "live"; $("status-t").textContent = "Robinhood Chain · live";
-  } catch {
-    S.pools = samplePools(); S.sample = true;
-    $("status").dataset.s = "sample"; $("status-t").textContent = "Sample data";
-    $("status").title = "DexPaprika cannot be reached from this page. Host it on your own domain to load live data.";
+    const d = await api(searchPath("order_by=volume_usd_24h&sort=desc&limit=50"));
+    const all = (d.results || []).map(normalizePool);
+    if (!all.length) throw new Error("empty");
+    S.allPools = all; S.pools = dedupe(all); S.sample = false; setLive(true);
+  } catch (e) {
+    if (silent && !S.sample) return;                         // keep showing the last good data
+    S.allPools = S.pools = samplePools(); S.sample = true;
+    const blocked = e && (e.name === "TypeError" || e.status === 404);
+    setLive(false, blocked
+      ? "Live data needs the TradePad server: DexPaprika blocks direct browser calls. Deploy with server.js (Railway) to load real prices."
+      : "DexPaprika did not answer (" + (e && e.message || "error") + "). Showing sample data.");
   }
-  getToken(WETH);
+  if (!S.prices[WETH] && !S.sample) getToken(WETH);
   renderTable(); renderTrend(); renderWatch(); updateVolumeKpi(); updatePulse();
-  if (!S.sel && S.pools.length) selectPool(S.pools[0]);
+  if (!S.sel && S.pools.length) selectPool(S.pools.find(p => !QUOTES.has(lc(splitPool(p).base.id))) || S.pools[0]);
+  else if (S.sel && silent) refreshSelected();
 }
 async function loadNewPools() {
-  if (S.newPools) return S.newPools;
+  if (S.newPools && Date.now() - S.newAt < 60000) return S.newPools;
   if (S.sample) return S.newPools = [...S.pools].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  try { const d = await api(`/networks/${S.net}/pools?limit=30&page=0&order_by=created_at&sort=desc`); return S.newPools = d.pools || []; }
-  catch { return []; }
+  try { const d = await api(searchPath("order_by=created_at&sort=desc&limit=30")); S.newAt = Date.now(); return S.newPools = (d.results || []).map(normalizePool); }
+  catch { return S.newPools || []; }
+}
+async function loadMissingStars() {
+  if (S.sample) return;
+  const missing = [...S.stars].filter(id => !poolForToken(id)).slice(0, 4);
+  for (const id of missing) await getToken(id);
+  if (missing.length) { renderWatch(); if (S.trendTab === "watch") renderTrend(); }
 }
 const venueOk = (p) => !S.venue || lc(p.dex_name + " " + p.dex_id).includes(S.venue);
-function updateVolumeKpi() { const v = S.pools.reduce((s, p) => s + (Number(p.volume_usd) || 0), 0); $("k-vol").textContent = fmtUsd(v); }
+function updateVolumeKpi() { const v = (S.allPools || S.pools).reduce((s, p) => s + (Number(p.volume_usd) || 0), 0); $("k-vol").textContent = fmtUsd(v); }
 
 // ======================= ASSETS TABLE =======================
 let tableSeq = 0;
 async function renderTable() {
   const seq = ++tableSeq; const body = $("assets");
   let pools = S.tableTab === "new" ? await loadNewPools() : S.pools;
-  pools = pools.filter(venueOk).slice(0, CONFIG.TABLE_ROWS);
-  if (!pools.length) { body.innerHTML = `<tr><td colspan="6" class="empty">No pools match this filter.</td></tr>`; return; }
-  const draw = () => {
-    if (seq !== tableSeq) return;
-    let rows = pools.map(p => ({ p, ...splitPool(p) }));
-    rows.forEach(r => r.t = S.tokens[lc(r.base.id)]);
-    if (S.tableTab === "gainers") rows = rows.filter(r => r.t && r.t.change > 0).sort((a, b) => b.t.change - a.t.change);
-    if (S.tableTab === "losers") rows = rows.filter(r => r.t && r.t.change < 0).sort((a, b) => a.t.change - b.t.change);
-    if (!rows.length) { body.innerHTML = `<tr><td colspan="6" class="empty">${S.tableTab === "gainers" ? "No tokens in this list are up yet." : "No tokens in this list are down yet."}</td></tr>`; return; }
-    body.innerHTML = rows.map(({ p, base, quote, t }) => `<tr>
-      <td>${starBtn(base.id)}</td>
-      <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b><span class="nm">${esc(base.name || "")}</span><span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
-      <td class="r b">${t ? fmtUsd(t.price) : '<span class="skel">$0.000</span>'}</td>
-      <td class="r">${S.tableTab === "new" ? ago(p.created_at) : fmtUsd(p.volume_usd)}</td>
-      <td class="r">${t ? chipHTML(t.change) : '<span class="skel">0.00%</span>'}</td>
-      <td class="r"><button class="btn btn-s" data-pool="${esc(p.id)}">Trade</button></td></tr>`).join("");
-    body.querySelectorAll("[data-pool]").forEach(b => b.onclick = () => { selectPool(pools.find(x => x.id === b.dataset.pool)); jump("c-chart"); });
-    wireStars(body);
-  };
-  draw();
-  await Promise.all(pools.map(p => getToken(splitPool(p).base.id)));
-  draw(); renderWatch(); renderTrend(); updatePulse();
+  if (seq !== tableSeq) return;
+  pools = pools.filter(venueOk);
+  let rows = pools.map(p => ({ p, ...splitPool(p) }));
+  rows.forEach(r => r.t = S.tokens[lc(r.base.id)]);
+  if (S.tableTab === "gainers") rows = rows.filter(r => r.t && r.t.change > 0).sort((a, b) => b.t.change - a.t.change);
+  if (S.tableTab === "losers") rows = rows.filter(r => r.t && r.t.change < 0).sort((a, b) => a.t.change - b.t.change);
+  rows = rows.slice(0, CONFIG.TABLE_ROWS);
+  if (!rows.length) {
+    const msg = S.tableTab === "gainers" ? "No tokens in this list are up right now." : S.tableTab === "losers" ? "No tokens in this list are down right now." : "No pools match this filter.";
+    body.innerHTML = `<tr><td colspan="6" class="empty">${msg}</td></tr>`; return;
+  }
+  body.innerHTML = rows.map(({ p, base, quote, t }) => `<tr>
+    <td>${starBtn(base.id)}</td>
+    <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b><span class="nm">${esc(base.name || "")}</span><span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
+    <td class="r b">${t && t.price > 0 ? fmtPrice(t.price) : "—"}</td>
+    <td class="r">${S.tableTab === "new" ? ago(p.created_at) : fmtUsd(p.volume_usd)}</td>
+    <td class="r">${t ? chipHTML(t.change) : '<span class="muted">—</span>'}</td>
+    <td class="r"><button class="btn btn-s" data-pool="${esc(p.id)}">Trade</button></td></tr>`).join("");
+  body.querySelectorAll("[data-pool]").forEach(b => b.onclick = () => { selectPool(pools.find(x => x.id === b.dataset.pool)); jump("c-chart"); });
+  wireStars(body);
 }
 function starBtn(id) { const on = S.stars.has(lc(id)); return `<button class="star" data-star="${esc(lc(id))}" aria-pressed="${on}" title="${on ? "Remove from" : "Add to"} watchlist"><svg><use href="#i-star"/></svg></button>`; }
 function wireStars(root) {
@@ -687,11 +765,16 @@ function wireStars(root) {
     S.stars.has(id) ? S.stars.delete(id) : S.stars.add(id); save("stars", JSON.stringify([...S.stars]));
     document.querySelectorAll(`[data-star="${id}"]`).forEach(x => x.setAttribute("aria-pressed", S.stars.has(id)));
     renderWatch(); if (S.trendTab === "watch") renderTrend();
+    if (S.stars.has(id) && !poolForToken(id)) loadMissingStars();
   });
 }
 
 // ======================= WATCHLIST =======================
-function poolForToken(id) { return S.pools.find(p => splitPool(p).base.id && lc(splitPool(p).base.id) === id) || (S.newPools || []).find(p => lc(splitPool(p).base.id) === id); }
+function poolForToken(id) {
+  id = lc(id);
+  const hit = (list) => (list || []).find(p => lc(splitPool(p).base.id) === id);
+  return hit(S.pools) || hit(S.newPools) || hit(S.extra);
+}
 function watchPools() {
   const starred = [...S.stars].map(poolForToken).filter(Boolean);
   return starred.length ? { list: starred, starred: true } : { list: S.pools.slice(0, 6), starred: false };
@@ -703,24 +786,22 @@ function renderWatch() {
   const rows = list.filter(p => { const { base } = splitPool(p); return !f || lc(base.symbol + " " + base.name).includes(f); });
   if (!rows.length) { box.innerHTML = '<div class="empty">No matches.</div>'; return; }
   box.innerHTML = rows.map(p => { const { base } = splitPool(p); const t = S.tokens[lc(base.id)];
-    return `<div class="lrow" role="button" tabindex="0" data-pool="${esc(p.id)}">${starBtn(base.id)}<span class="b ellip">${esc(base.symbol)}</span><span class="r b">${t ? fmtUsd(t.price) : "—"}</span><span class="r" style="min-width:58px">${t ? chipHTML(t.change) : "—"}</span></div>`; }).join("");
+    return `<div class="lrow" role="button" tabindex="0" data-pool="${esc(p.id)}">${starBtn(base.id)}<span class="b ellip">${esc(base.symbol)}</span><span class="r b">${t && t.price > 0 ? fmtPrice(t.price) : "—"}</span><span class="r" style="min-width:58px">${t ? chipHTML(t.change) : "—"}</span></div>`; }).join("");
   box.querySelectorAll(".lrow").forEach(r => { const go = () => { selectPool(rows.find(p => p.id === r.dataset.pool)); jump("c-chart"); }; r.onclick = go; r.onkeydown = (e) => { if (e.key === "Enter") go(); }; });
   wireStars(box);
 }
 $("wq").addEventListener("input", renderWatch);
 
 // ======================= TRENDING + SPARKLINE =======================
-const sparks = {};
-async function getSpark(pool) {
-  if (sparks[pool.id]) return sparks[pool.id];
-  const { baseIndex } = splitPool(pool);
-  let rows;
-  if (S.sample) rows = sampleCandles(pool.id, 24, "1h");
-  else {
-    try { const start = new Date(Date.now() - 86400e3).toISOString().slice(0, 19) + "Z"; const d = await api(`/networks/${S.net}/pools/${pool.id}/ohlcv?start=${encodeURIComponent(start)}&interval=1h&limit=24&inversed=${baseIndex === 1}`); rows = Array.isArray(d) ? d : (d.data || []); }
-    catch { rows = []; }
-  }
-  return sparks[pool.id] = rows.map(r => +r.close).filter(isFinite);
+// Sparkline points come from the token's own 24h / 6h / 1h / 30m / 15m / 5m price changes: no extra requests.
+function getSpark(pool) {
+  const { base } = splitPool(pool);
+  if (S.sample) return sampleCandles(pool.id, 24, "1h").map(r => +r.close);
+  const t = S.tokens[lc(base.id)];
+  if (!t || !t.tf || !(t.price > 0)) return [];
+  const pts = ["24h", "6h", "1h", "30m", "15m", "5m"].map(k => { const c = Number(t.tf[k]?.last_price_usd_change); return isFinite(c) && c > -100 ? t.price / (1 + c / 100) : null; }).filter(v => v != null);
+  pts.push(t.price);
+  return pts;
 }
 function sparkSVG(vals) {
   if (vals.length < 2) return `<svg class="spark" viewBox="0 0 100 28"></svg>`;
@@ -730,24 +811,24 @@ function sparkSVG(vals) {
     return `<rect x="${(i * w + w * .2).toFixed(2)}" y="${Math.max(0, Math.min(25, y)).toFixed(2)}" width="${(w * .6).toFixed(2)}" height="${h.toFixed(2)}" rx="0.6" fill="${up ? "var(--up)" : "rgba(237,230,218,.5)"}"/>`; }).join("");
   return `<svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">${bars}</svg>`;
 }
-let trendSeq = 0;
-async function renderTrend() {
-  const seq = ++trendSeq; const box = $("trend");
+function renderTrend() {
+  const box = $("trend");
   const list = (S.trendTab === "watch" ? watchPools().list : S.pools.filter(venueOk)).slice(0, 5);
   if (!list.length) { box.innerHTML = '<div class="empty">No tokens yet.</div>'; return; }
-  const draw = () => {
-    if (seq !== trendSeq) return;
-    box.innerHTML = list.map(p => { const { base } = splitPool(p); const t = S.tokens[lc(base.id)];
-      return `<button class="trow" data-pool="${esc(p.id)}">${avHTML(base.symbol, base.id)}<div style="min-width:0"><div class="b ellip">${esc(base.name || base.symbol)}</div><div class="muted" style="font-size:11px">${esc(base.symbol)}</div></div><span class="price-tag">${t ? fmtUsd(t.price) : "—"}</span>${sparkSVG(sparks[p.id] || [])}<span class="chg">${t ? chipHTML(t.change) : ""}</span></button>`; }).join("");
-    box.querySelectorAll(".trow").forEach(b => b.onclick = () => { selectPool(list.find(p => p.id === b.dataset.pool)); jump("c-chart"); });
-  };
-  draw();
-  await Promise.all(list.map(getSpark));
-  draw();
+  box.innerHTML = list.map(p => { const { base } = splitPool(p); const t = S.tokens[lc(base.id)];
+    return `<button class="trow" data-pool="${esc(p.id)}">${avHTML(base.symbol, base.id)}<div style="min-width:0"><div class="b ellip">${esc(base.name || base.symbol)}</div><div class="muted" style="font-size:11px">${esc(base.symbol)}</div></div><span class="price-tag">${t && t.price > 0 ? fmtPrice(t.price) : "—"}</span>${sparkSVG(getSpark(p))}<span class="chg">${t ? chipHTML(t.change) : ""}</span></button>`; }).join("");
+  box.querySelectorAll(".trow").forEach(b => b.onclick = () => { selectPool(list.find(p => p.id === b.dataset.pool)); jump("c-chart"); });
 }
 document.querySelectorAll("[data-tr]").forEach(b => b.onclick = () => { document.querySelectorAll("[data-tr]").forEach(x => x.setAttribute("aria-selected", x === b)); S.trendTab = b.dataset.tr; renderTrend(); });
 
 // ======================= DETAIL =======================
+function showTokenStats(t) {
+  $("t-price").textContent = t && t.price > 0 ? fmtPrice(t.price) : "—";
+  $("t-vol").textContent = t ? fmtUsd(t.vol) : "—"; $("t-liq").textContent = t ? fmtUsd(t.liq) : "—";
+  const c = $("t-change");
+  if (t && isFinite(t.change)) { c.textContent = fmtPct(t.change); c.className = "chip " + (t.change >= 0 ? "up" : "down"); }
+  else { c.textContent = "—"; c.className = "chip"; }
+}
 async function selectPool(pool) {
   if (!pool) return;
   const { base, quote, baseIndex } = splitPool(pool);
@@ -757,15 +838,20 @@ async function selectPool(pool) {
   $("t-name").textContent = base.name || "";
   const a = $("t-addr"); a.textContent = short(base.id); a.href = `${CONFIG.EXPLORER}/token/${base.id}`;
   $("cp").onclick = (e) => copy(base.id, e.currentTarget);
-  $("tx-pool").textContent = `${base.symbol || ""}/${quote.symbol || ""}`;
-  ["t-price", "t-vol", "t-liq"].forEach(id => $(id).textContent = "—"); $("t-change").textContent = "—"; $("t-change").className = "chip";
-  renderSwapStatic();
-  getToken(base.id).then(t => { if (S.sel?.base.id !== base.id || !t) return;
-    $("t-price").textContent = fmtUsd(t.price); $("t-vol").textContent = fmtUsd(t.vol); $("t-liq").textContent = fmtUsd(t.liq);
-    const c = $("t-change"); c.textContent = fmtPct(t.change); c.className = "chip " + (t.change >= 0 ? "up" : "down");
-    flash($("t-price"), t.change >= 0); requestQuote(); });
-  getToken(quote.id).then(requestQuote);
-  loadChart(); loadTxs(); checkPons();
+  $("tx-pool").textContent = base.symbol || "";
+  showTokenStats(S.tokens[lc(base.id)]);
+  renderSwapStatic(); renderActivity();
+  getToken(base.id).then(t => { if (S.sel?.base.id !== base.id) return; showTokenStats(t); if (t) flash($("t-price"), t.change >= 0); renderActivity(); requestQuote(); });
+  if (quote.id) getToken(quote.id).then(requestQuote);
+  loadChart(); checkPons();
+}
+function refreshSelected() {
+  const fresh = poolForToken(S.sel.base.id);
+  if (fresh) S.sel.pool = fresh;
+  const t = S.tokens[lc(S.sel.base.id)];
+  const before = $("t-price").textContent;
+  showTokenStats(t); renderActivity(); requestQuote();
+  if (t && before !== $("t-price").textContent) flash($("t-price"), t.change >= 0);
 }
 function jump(id) { if (matchMedia("(max-width:1240px)").matches) $(id).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }
 
@@ -794,45 +880,58 @@ function ensureChart() {
 function retheme() { if (!chart) return; chart.applyOptions(chartTheme()); candle.applyOptions(candleColors()); if (lastBars) vol.setData(volData(lastBars)); }
 new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
-const INTERVALS = { "15m": { s: 86400, limit: 96 }, "1h": { s: 7 * 86400, limit: 168 }, "6h": { s: 30 * 86400, limit: 120 }, "24h": { s: 120 * 86400, limit: 120 } };
+// Keyless DexPaprika: 1h candles for the last 24h only. A free key unlocks 10m+ intervals and 7 days.
+const INTERVALS = { "15m": { s: 86400, limit: 96, key: true }, "1h": { s: 7 * 86400, limit: 168 }, "6h": { s: 7 * 86400, limit: 28, key: true }, "24h": { s: 7 * 86400, limit: 7, key: true } };
+function intervalCfg(iv) { const c = INTERVALS[iv]; return CONFIG.HAS_KEY ? c : { ...c, s: Math.min(c.s, 23 * 3600), limit: Math.min(c.limit, 24) }; }
+function setupIntervals() {
+  $("intervals").querySelectorAll("button").forEach(b => {
+    const locked = INTERVALS[b.dataset.i].key && !CONFIG.HAS_KEY;
+    b.disabled = locked; b.style.opacity = locked ? .4 : ""; b.style.cursor = locked ? "not-allowed" : "";
+    b.title = locked ? "Needs a free DexPaprika API key on the server (DEXPAPRIKA_API_KEY)" : "";
+    b.onclick = () => { if (locked) return; $("intervals").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); S.interval = b.dataset.i; loadChart(); };
+    b.setAttribute("aria-pressed", b.dataset.i === S.interval);
+  });
+}
 let lastBars = null;
 const volData = (bars) => bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? "rgba(204,255,4,.3)" : "rgba(237,230,218,.16)" }));
 async function loadChart() {
   const note = $("chart-note"); note.hidden = false; note.textContent = "Loading chart…";
   if (!ensureChart()) return;
-  const { pool, baseIndex } = S.sel; const cfg = INTERVALS[S.interval];
-  let rows;
+  const { pool, base } = S.sel; const cfg = intervalCfg(S.interval);
+  let rows = [], err = null;
   if (S.sample) rows = sampleCandles(pool.id, cfg.limit, S.interval);
   else {
-    try { const start = new Date(Date.now() - cfg.s * 1000).toISOString().slice(0, 19) + "Z";
-      const d = await api(`/networks/${S.net}/pools/${pool.id}/ohlcv?start=${encodeURIComponent(start)}&interval=${S.interval}&limit=${cfg.limit}&inversed=${baseIndex === 1}`);
-      rows = Array.isArray(d) ? d : (d.data || d.ohlcv || []); } catch { rows = []; }
+    // OHLCV prices follow DexPaprika's own base token; invert when that is not the token we show
+    const bp = S.tokens[lc(base.id)]?.price, pp = pool.price_usd;
+    const inv = bp > 0 && pp > 0 ? Math.abs(Math.log(bp / pp)) > Math.log(1.5) : false;
+    try {
+      const start = new Date(Date.now() - cfg.s * 1000).toISOString().slice(0, 19) + "Z";
+      const d = await api(`/networks/${NET()}/pools/${pool.id}/ohlcv?start=${encodeURIComponent(start)}&interval=${S.interval}&limit=${cfg.limit}&inversed=${inv}`);
+      rows = Array.isArray(d) ? d : (d.data || d.ohlcv || []);
+    } catch (e) { err = e; }
   }
   if (S.sel?.pool.id !== pool.id) return;
   const bars = rows.map(r => ({ time: Math.floor(new Date(r.time_open || r.time).getTime() / 1000), open: +r.open, high: +r.high, low: +r.low, close: +r.close, volume: +r.volume || 0 }))
     .filter(r => isFinite(r.time) && isFinite(r.close)).sort((a, b) => a.time - b.time).filter((r, i, a) => i === 0 || r.time !== a[i - 1].time);
   lastBars = bars;
   candle.setData(bars.map(({ volume, ...b }) => b)); vol.setData(volData(bars)); chart.timeScale().fitContent();
-  if (!bars.length) note.textContent = "No price data for this range yet."; else note.hidden = true;
+  if (bars.length) { note.hidden = true; return; }
+  note.textContent = err && err.status === 403 ? "This chart range needs a free DexPaprika API key." : err && err.status === 429 ? "Chart data is rate limited. Try again in a minute." : "No price data for this range yet.";
 }
-$("intervals").querySelectorAll("button").forEach(b => b.onclick = () => { $("intervals").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); S.interval = b.dataset.i; loadChart(); });
 
-// ======================= TRADES =======================
-async function loadTxs() {
-  const body = $("txs"); const { pool, baseIndex, base } = S.sel;
-  body.innerHTML = '<tr><td colspan="3" class="muted">Loading…</td></tr>';
-  let txs;
-  if (S.sample) txs = sampleTxs(pool.id);
-  else { try { const d = await api(`/networks/${S.net}/pools/${pool.id}/transactions?limit=12`); txs = d.transactions || d.data || []; } catch { txs = []; } }
-  if (S.sel?.pool.id !== pool.id) return;
-  if (!txs.length) { body.innerHTML = '<tr><td colspan="3" class="muted">No trades yet.</td></tr>'; return; }
-  body.innerHTML = txs.slice(0, 12).map(t => {
-    const amt = Math.abs(Number(baseIndex === 1 ? t.amount_1 : t.amount_0));
-    const pu = Number(baseIndex === 1 ? t.price_1_usd : t.price_0_usd);
-    const hash = String(t.id || "").split("_")[0];
-    const when = hash.startsWith("0x") ? `<a href="${CONFIG.EXPLORER}/tx/${esc(hash)}" target="_blank" rel="noopener">${ago(t.created_at)}</a>` : ago(t.created_at);
-    return `<tr><td class="muted">${when}</td><td class="r b">${fmtNum(amt, 2)} <span class="muted" style="font-weight:600">${esc(base.symbol || "")}</span></td><td class="r">${isFinite(pu) ? fmtUsd(amt * pu) : "—"}</td></tr>`;
-  }).join("");
+// ======================= ACTIVITY =======================
+// Buy and sell counts per window for the selected token (DexPaprika's trade list needs a paid plan).
+function renderActivity() {
+  const body = $("txs"); const sel = S.sel; if (!sel) return;
+  const t = S.tokens[lc(sel.base.id)];
+  if (!t || !t.tf) { body.innerHTML = `<tr><td colspan="3" class="muted">${t ? "No activity data for this token yet." : "Loading…"}</td></tr>`; return; }
+  const rows = [["5m", "5 min"], ["1h", "1 hour"], ["6h", "6 hours"], ["24h", "24 hours"]].map(([k, label]) => {
+    const w = t.tf[k] || {}; const b = Number(w.buys) || 0, s = Number(w.sells) || 0, n = b + s;
+    const pb = n ? Math.round(b / n * 100) : 0;
+    const bar = n ? `<div style="display:flex;height:6px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.08);margin-top:6px"><i style="width:${pb}%;background:var(--up)"></i><i style="flex:1;background:rgba(237,230,218,.4)"></i></div>` : "";
+    return `<tr><td class="muted">${label}</td><td class="r" style="min-width:150px"><span class="b up">${fmtNum(b, 0)}</span> <span class="muted">buys</span> · <span class="b">${fmtNum(s, 0)}</span> <span class="muted">sells</span>${bar}</td><td class="r b">${fmtUsd(w.volume_usd)}</td></tr>`;
+  });
+  body.innerHTML = rows.join("");
 }
 
 // ======================= SEARCH =======================
@@ -845,26 +944,28 @@ $("q").addEventListener("input", (e) => {
     if (S.sample) pools = S.pools.filter(p => lc(JSON.stringify(p.tokens)).includes(lc(q)));
     else {
       try {
-        if (/^0x[0-9a-fA-F]{40}$/.test(q)) { const d = await api(`/networks/${S.net}/tokens/${q}/pools?limit=5&order_by=volume_usd&sort=desc`); pools = d.pools || []; }
-        else {
+        if (/^0x[0-9a-fA-F]{40}$/.test(q)) {
+          const d = await api(searchPath(`token_address=${lc(q)}&order_by=volume_usd_24h&sort=desc&limit=5`));
+          pools = (d.results || []).map(normalizePool);
+        } else {
           const d = await api(`/search?query=${encodeURIComponent(q)}`);
-          pools = (d.pools || []).filter(p => lc(p.chain) === S.net);
-          for (const t of (d.tokens || []).filter(t => lc(t.chain) === S.net).slice(0, 3)) {
-            try { const r = await api(`/networks/${S.net}/tokens/${t.id}/pools?limit=1&order_by=volume_usd&sort=desc`); if (r.pools?.[0]) pools.unshift(r.pools[0]); } catch {}
-          }
+          pools = (d.pools || []).filter(p => lc(p.chain) === NET()).map(normalizePool);
         }
-      } catch {}
+      } catch (err) {
+        box.innerHTML = `<div class="empty">${err && err.status === 429 ? "Too many searches. Try again in a minute." : "Search is unavailable right now."}</div>`; box.hidden = false; return;
+      }
     }
-    const seen = new Set(); pools = pools.filter(p => !seen.has(p.id) && seen.add(p.id)).slice(0, 10);
+    if ($("q").value.trim() !== q) return;
+    const seen = new Set(); pools = pools.filter(p => !seen.has(p.id) && seen.add(p.id)).sort((a, b) => (b.volume_usd || 0) - (a.volume_usd || 0)).slice(0, 10);
     box.innerHTML = pools.length ? "" : '<div class="empty">Not found on Robinhood Chain.</div>';
     for (const p of pools) {
       const { base, quote } = splitPool(p); const b = document.createElement("button");
       b.innerHTML = `${avHTML(base.symbol, base.id)}<div style="min-width:0;flex:1"><b>${esc(base.symbol)}</b> <span class="muted">/ ${esc(quote.symbol)}</span><div class="muted" style="font-size:11px">${short(base.id)}</div></div><span class="muted">${fmtUsd(p.volume_usd)}</span>`;
-      b.onclick = () => { box.hidden = true; $("q").value = ""; if (!S.pools.includes(p)) S.pools.push(p); selectPool(p); };
+      b.onclick = () => { box.hidden = true; $("q").value = ""; if (!poolForToken(base.id)) S.extra.push(p); selectPool(p); };
       box.appendChild(b);
     }
     box.hidden = false;
-  }, 300);
+  }, 450);
 });
 document.addEventListener("click", (e) => { if (!e.target.closest(".search")) $("results").hidden = true; });
 
@@ -1099,7 +1200,7 @@ $("go").onclick = async () => {
     showMsg(`Submitted: <a href="${CONFIG.EXPLORER}/tx/${tx.hash}" target="_blank" rel="noopener">${short(tx.hash)}</a>`, "", true);
     await tx.wait();
     showMsg(`Swap complete. <a href="${CONFIG.EXPLORER}/tx/${tx.hash}" target="_blank" rel="noopener">View transaction</a>`, "ok", true);
-    $("amt").value = ""; checkPons(); updateBalance(); loadTxs(); refreshWallet(); readRouter();
+    $("amt").value = ""; checkPons(); updateBalance(); refreshWallet(); readRouter();
   } catch (e) { showMsg(errText(e), "err"); }
   finally { requestQuote(); }
 };
@@ -1143,6 +1244,7 @@ function samplePools() {
 }
 function sampleToken(id) { if (id === WETH) return { summary: { price_usd: 3500 } }; const r = rng(id); const pr = 0.0002 + r() * 0.004; return { summary: { price_usd: pr, liquidity_usd: 90000 + r() * 500000, fdv: pr * 1e9, "24h": { volume_usd: 50000 + r() * 1.5e6, txns: (r() * 9000) | 0, last_price_usd_change: (r() - 0.45) * 46 } } }; }
 function sampleCandles(seed, n, iv) { const r = rng(seed + iv); let p = 0.001; const step = INTERVALS[iv].s / n; const now = Date.now() / 1000; return Array.from({ length: n }, (_, i) => { const o = p; p = Math.max(1e-6, p * (1 + (r() - 0.48) * 0.08)); return { time_open: new Date((now - (n - i) * step) * 1000).toISOString(), open: o, high: Math.max(o, p) * (1 + r() * 0.03), low: Math.min(o, p) * (1 - r() * 0.03), close: p, volume: 2000 + r() * 30000 }; }); }
+function sampleTf(id) { const r = rng("tf" + id); const o = {}; for (const [k, n] of [["5m", 40], ["15m", 120], ["30m", 260], ["1h", 520], ["6h", 3100], ["24h", 12000]]) { const b = Math.round(n * (0.35 + r() * 0.3)); o[k] = { buys: b, sells: n - b, txns: n, volume_usd: n * (40 + r() * 160), last_price_usd_change: (r() - 0.45) * (k === "24h" ? 30 : 8) }; } return o; }
 function sampleTxs(seed) { const r = rng("tx" + seed); return Array.from({ length: 12 }, (_, i) => ({ id: "", created_at: new Date(Date.now() - i * 47e3 - r() * 3e4).toISOString(), amount_0: 0, amount_1: (r() * 2e5) | 0, price_1_usd: S.tokens[lc(S.sel.base.id)]?.price || 0.001 })); }
 
 // ======================= START =======================
@@ -1167,7 +1269,7 @@ function updatePulse() {
   if (best) { $("p-top").innerHTML = `${esc(best.base.symbol)} <span class="${best.t.change >= 0 ? "up" : "down"}">${best.t.change >= 0 ? "+" : "−"}${fmtPct(best.t.change)}</span>`; }
   // ticker
   const items = S.pools.slice(0, 16).map(p => { const { base } = splitPool(p); const t = S.tokens[lc(base.id)];
-    return `<span class="tk">${avHTML(base.symbol, base.id)}${esc(base.symbol)}<span class="p">${t ? fmtUsd(t.price) : ""}</span>${t ? chipHTML(t.change) : ""}</span>`; }).join("");
+    return `<span class="tk">${avHTML(base.symbol, base.id)}${esc(base.symbol)}<span class="p">${t && t.price > 0 ? fmtPrice(t.price) : ""}</span>${t ? chipHTML(t.change) : ""}</span>`; }).join("");
   const track = $("ticker"); track.innerHTML = items + items;
   if (window.gsap && !REDUCED) {
     tickerTween?.kill(); gsap.set(track, { x: 0 });
@@ -1258,7 +1360,10 @@ if (window.gsap && !REDUCED) {
 }
 
 renderRevenue(null);
-(async () => { await resolveNetwork(); await loadPools(); })();
+setupIntervals();
+loadPools().then(loadMissingStars);
+// refresh market data every minute while the tab is visible (the server caches DexPaprika for ~60s)
+setInterval(() => { if (!document.hidden && !S.sample) { S.newAt = 0; loadPools(true); if (S.tableTab === "new") renderTable(); } }, 60000);
 })();
 </script>
 

@@ -32,12 +32,29 @@ git push -u origin main
 |---|---|---|---|
 | `ROUTER_ADDRESS` | after step 3 | `0xAbC…` | Your deployed PonsRouter. Leave empty until then. |
 | `DEFAULT_FEE_BPS` | no | `50` | Fee shown before the router is read (50 = 0.5%). |
+| `DEXPAPRIKA_API_KEY` | recommended | `api_…` | Free key from console.dexpaprika.com. Unlocks 15m/6H/1D charts and 7 days of history, and raises rate limits. Stays on the server. |
 | `EXPLORER_URL` | no | `https://robinhoodchain.blockscout.com` | Override block explorer. |
 | `DEXPAPRIKA_API` | no | `https://api.dexpaprika.com` | Override API base. |
 
    `PORT` is set by Railway automatically. Do **not** add private keys or RPC keys here; the frontend never needs them (users sign with their own wallet).
 4. Settings → Networking → **Generate Domain** (or add your own domain).
 5. After changing a variable, Railway redeploys; `/config.js` picks up the new values.
+
+## Market data (DexPaprika)
+DexPaprika does not allow direct browser calls (no CORS), so live data needs `server.js`:
+the page calls `/dp/...` and the server forwards to DexPaprika, caches each answer for about
+60 seconds (all visitors share it), and adds `DEXPAPRIKA_API_KEY` if you set one.
+Only Robinhood Chain endpoints used by the DEX are forwarded.
+
+| | Without a key | With a free key |
+|---|---|---|
+| Pools, prices, gainers, new pairs, search | yes | yes |
+| Chart | 1H candles, last 24h | 15m / 1H / 6H / 1D, last 7 days |
+| Buy/sell activity | yes | yes |
+| Trade list | no (DexPaprika Dev plan only) | no (Dev plan only) |
+
+Static hosts (Netlify drop, Cloudflare Pages upload) have no server, so the page falls back to
+sample data there. Use Railway (or any Node host) for live data.
 
 ## 3. Deploy the router contract (from your own computer, not Railway)
 ```bash
