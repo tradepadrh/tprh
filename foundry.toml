@@ -1,0 +1,9 @@
+[profile.default]
+src = "contracts"
+test = "test"
+libs = ["lib"]
+solc_version = "0.8.26"
+evm_version = "cancun"
+via_ir = true
+optimizer = true
+remappings = ["forge-std/=lib/forge-std/src/"]

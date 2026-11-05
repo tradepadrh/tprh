@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="TP app icon">
+  <title>TP app icon</title>
+  <rect width="512" height="512" rx="112" fill="#141414"/>
+  <g transform="translate(256 256) scale(2.6) translate(-88 -94)">
+    <path fill="#CCFF04" d="M44 41 H150 C158 41 164.5 47 164.5 55 V61.5 L130.5 115.5 C128.5 118.5 125.5 119.5 122 119.5 H92.5 L76.5 147 H53 L82 101 H115.5 L140 61.5 H32.5 Z"/>
+    <path fill="#CCFF04" d="M25 71 H122 L109.5 91.5 H73.5 L39.5 147 H16.5 L51 91.5 H12.5 Z"/>
+  </g>
+</svg>
