@@ -74,12 +74,23 @@ const cache = new Map();      // key -> { status, type, body, exp }
 const inflight = new Map();   // key -> Promise
 const MAX_ENTRIES = 400;
 
-function fetchUpstream(apiPath, search) {
+// With a key: if DexPaprika rejects it (401/403), answer the same request keyless instead of failing.
+let keyWarned = false;
+async function fetchUpstream(apiPath, search) {
+  const r = await fetchOnce(apiPath, search, true);
+  if (API_KEY && (r.status === 401 || r.status === 403)) {
+    const free = await fetchOnce(apiPath, search, false);
+    if (!keyWarned && free.status !== 401 && free.status !== 403) { keyWarned = true; console.warn("[dexpaprika] DEXPAPRIKA_API_KEY was rejected (" + r.status + "); answering keyless. Check the key in Railway variables."); }
+    return free.status === 200 ? free : r;
+  }
+  return r;
+}
+function fetchOnce(apiPath, search, useKey) {
   return new Promise((resolve, reject) => {
     const url = new URL(API_ORIGIN + apiPath + search);
     const lib = url.protocol === "http:" ? http : https;
     const headers = { Accept: "application/json", "User-Agent": "TradePad/1.0 (+server.js)" };
-    if (API_KEY) headers.Authorization = API_KEY;   // DexPaprika: the key is the whole header value
+    if (API_KEY && useKey) headers.Authorization = API_KEY;   // DexPaprika: the key is the whole header value
     const req = lib.get(url, { headers, timeout: 15000 }, (up) => {
       const chunks = [];
       up.on("data", (c) => chunks.push(c));

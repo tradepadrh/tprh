@@ -430,6 +430,8 @@ th.r, td.r { text-align: right; }
           </div>
           <div class="ch-bar">
             <div class="seg" id="intervals">
+              <button data-i="1m" aria-pressed="false" hidden>1m</button>
+              <button data-i="5m" aria-pressed="false" hidden>5m</button>
               <button data-i="15m" aria-pressed="false">15m</button>
               <button data-i="1h" aria-pressed="true">1H</button>
               <button data-i="6h" aria-pressed="false">6H</button>
@@ -591,6 +593,9 @@ const ABI = {
     "function sell(address token,uint256 tokensIn,uint256 minQuoteOut,uint256 deadline) returns (uint256)",
     "function buyV3(address token,uint24 poolFee,uint256 minTokensOut,uint256 deadline) payable returns (uint256)",
     "function sellV3(address token,uint24 poolFee,uint256 tokensIn,uint256 minEthOut,uint256 deadline) returns (uint256)",
+    "error InsufficientOutput(uint256 got, uint256 minOut)", "error Expired()", "error UnknownToken()", "error UnsupportedPhase(uint8 phase)",
+    "error ZeroAmount()", "error ValueMismatch()", "error NoPool()", "error TransferFailed()", "error Reentrancy()",
+    "error SlippageExceeded(uint256 got, uint256 minOut)",                       // raised by the Pons curve itself
     "event Bought(address indexed user, address indexed token, uint8 phase, uint256 quoteIn, uint256 frontendFee, uint256 tokensOut)",
     "event Sold(address indexed user, address indexed token, uint8 phase, uint256 tokensIn, uint256 frontendFee, uint256 quoteOut)",
   ],
@@ -926,11 +931,12 @@ async function multicall(calls) {
   }
   return out;
 }
-async function factoryLogs(topic, from, to, step) {
+const factoryLogs = (topic, from, to, step) => addrLogs(CONFIG.PONS_FACTORY, [topic], from, to, step);
+async function addrLogs(address, topics, from, to, step) {
   const out = []; let a = from;
   while (a <= to) {
     const b = Math.min(to, a + step - 1);
-    try { out.push(...await rpc().getLogs({ address: CONFIG.PONS_FACTORY, topics: [topic], fromBlock: a, toBlock: b })); a = b + 1; }
+    try { out.push(...await rpc().getLogs({ address, topics, fromBlock: a, toBlock: b })); a = b + 1; }
     catch (e) { if (step <= 50000) throw e; step = Math.floor(step / 2); }
   }
   return out;
@@ -1121,6 +1127,9 @@ async function selectPool(pool) {
   if (!pool) return;
   const { base, quote, baseIndex } = splitPool(pool);
   S.sel = { pool, base, quote, baseIndex }; S.pons = null;
+  if (pool.curve) { const age = (Date.now() - new Date(blockTime(pool.curve.block)).getTime()) / 1000; S.interval = age < 4 * 3600 ? "1m" : age < 24 * 3600 ? "5m" : age < 4 * 86400 ? "15m" : "1h"; }
+  else if (INTERVALS[S.interval]?.curveOnly || (INTERVALS[S.interval]?.key && !hasKey())) S.interval = "1h";
+  setupIntervals();
   $("t-av").outerHTML = avHTML(base.symbol, base.id).replace('class="av"', 'class="av" id="t-av"');
   $("t-sym").innerHTML = `${esc(base.symbol || "?")} <span class="muted" style="font-weight:600;font-size:13px">/ ${esc(quote.symbol || "")}</span>`;
   $("t-name").textContent = base.name || "";
@@ -1142,6 +1151,61 @@ function refreshSelected() {
   if (t && before !== $("t-price").textContent) flash($("t-price"), t.change >= 0);
 }
 function jump(id) { if (matchMedia("(max-width:1240px)").matches) $(id).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }
+
+// ======================= CURVE TRADES (on-chain) =======================
+// Pons curve events: Buy(sender, recipient) [quoteIn, tokensOut, fee, extra]  Sell(sender, recipient) [tokensIn, quoteOut, fee, extra]
+const CURVE_BUY = "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455";
+const CURVE_SELL = "0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df";
+const CURVE_TR = {};
+function curveTrades(L) {
+  const c = CURVE_TR[L.curve] || (CURVE_TR[L.curve] = { to: L.block - 1, trades: [], loading: null });
+  if (c.loading) return c.loading;
+  return c.loading = (async () => {
+    try {
+      const latest = await rpc().getBlockNumber();
+      if (latest > c.to) {
+        // one topic per query: the RPC limits OR-topic queries to 100k blocks
+        const logs = (await Promise.all([CURVE_BUY, CURVE_SELL].map(t => addrLogs(L.curve, [t], c.to + 1, latest, 2_000_000)))).flat();
+        for (const l of logs) {
+          const w = (l.data.slice(2).match(/.{64}/g) || []).map(x => BigInt("0x" + x)); if (w.length < 3) continue;
+          const buy = l.topics[0] === CURVE_BUY, extra = w[3] || 0n;
+          const net = buy ? w[0] - w[2] - extra : w[1] + w[2] + extra, tok = buy ? w[1] : w[0];   // quote that moved the curve
+          const qf = Number(ethers.formatUnits(net > 0n ? net : 0n, L.qDec)), tf = Number(ethers.formatUnits(tok, L.dec));
+          if (qf > 0 && tf > 0) c.trades.push({ block: l.blockNumber, idx: l.index, buy, price: qf / tf, q: Number(ethers.formatUnits(buy ? w[0] : w[1], L.qDec)) });
+        }
+        c.trades.sort((a, b) => a.block - b.block || a.idx - b.idx); c.to = latest;
+      }
+      return c.trades;
+    } finally { c.loading = null; }
+  })();
+}
+const tradeTs = (t) => Math.floor(new Date(blockTime(t.block)).getTime() / 1000);
+function curveCandles(trades, sec, usd) {
+  const m = new Map();
+  for (const t of trades) {
+    const ts = tradeTs(t), k = ts - ts % sec, p = t.price * usd; let c = m.get(k);
+    if (!c) m.set(k, c = { time: k, open: p, high: p, low: p, close: p, volume: 0 });
+    c.high = Math.max(c.high, p); c.low = Math.min(c.low, p); c.close = p; c.volume += t.q * usd;
+  }
+  const bars = [...m.values()].sort((a, b) => a.time - b.time);
+  for (let i = 1; i < bars.length; i++) { const b = bars[i]; b.open = bars[i - 1].close; b.high = Math.max(b.high, b.open); b.low = Math.min(b.low, b.open); }
+  return bars;
+}
+// price, 24h change, volume and buy/sell windows for a curve token, from the same trades
+function curveStats(L, trades, usd) {
+  const now = Date.now() / 1000, t = S.tokens[L.id] || (S.tokens[L.id] = {});
+  const win = (s) => { const r = { buys: 0, sells: 0, volume_usd: 0 }; for (const x of trades) if (now - tradeTs(x) <= s) { x.buy ? r.buys++ : r.sells++; r.volume_usd += x.q * usd; } r.txns = r.buys + r.sells; return r; };
+  t.tf = { "5m": win(300), "1h": win(3600), "6h": win(21600), "24h": win(86400) };
+  t.vol = t.tf["24h"].volume_usd; t.txns = t.tf["24h"].txns; t.curve = true;
+  const last = trades[trades.length - 1];
+  if (last) {
+    t.price = last.price * usd; S.prices[L.id] = t.price;
+    const ref = trades.find(x => now - tradeTs(x) <= 86400);
+    t.change = ref && ref !== last ? (last.price / ref.price - 1) * 100 : 0;
+  }
+  if (S.sel?.pool.curve === L) { showTokenStats(t); renderActivity(); }
+}
+setInterval(() => { if (S.sel?.pool.curve && !document.hidden) loadChart(true); }, 12000);
 
 // ======================= CHART =======================
 let chart, candle, vol;
@@ -1169,11 +1233,15 @@ function retheme() { if (!chart) return; chart.applyOptions(chartTheme()); candl
 new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
 // Keyless DexPaprika: 1h candles for the last 24h only. A free key unlocks 10m+ intervals and 7 days.
-const INTERVALS = { "15m": { s: 86400, limit: 96, key: true }, "1h": { s: 7 * 86400, limit: 168 }, "6h": { s: 7 * 86400, limit: 28, key: true }, "24h": { s: 7 * 86400, limit: 7, key: true } };
-function intervalCfg(iv) { const c = INTERVALS[iv]; return CONFIG.HAS_KEY ? c : { ...c, s: Math.min(c.s, 23 * 3600), limit: Math.min(c.limit, 24) }; }
+const IV_SEC = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "24h": 86400 };
+const INTERVALS = { "1m": { curveOnly: true }, "5m": { curveOnly: true }, "15m": { s: 86400, limit: 96, key: true }, "1h": { s: 7 * 86400, limit: 168 }, "6h": { s: 7 * 86400, limit: 28, key: true }, "24h": { s: 7 * 86400, limit: 7, key: true } };
+const hasKey = () => CONFIG.HAS_KEY && !S.keyBroken;                 // keyBroken: the server key was refused
+function intervalCfg(iv) { const c = INTERVALS[iv]; return hasKey() ? c : { ...c, s: Math.min(c.s, 23 * 3600), limit: Math.min(c.limit, 24) }; }
 function setupIntervals() {
   $("intervals").querySelectorAll("button").forEach(b => {
-    const locked = INTERVALS[b.dataset.i].key && !CONFIG.HAS_KEY;
+    const curve = !!S.sel?.pool.curve, cfg = INTERVALS[b.dataset.i];
+    b.hidden = !!cfg.curveOnly && !curve;
+    const locked = !curve && cfg.key && !hasKey();           // curve candles come from the chain: every interval works
     b.disabled = locked; b.style.opacity = locked ? .4 : ""; b.style.cursor = locked ? "not-allowed" : "";
     b.title = locked ? "Needs a free DexPaprika API key on the server (DEXPAPRIKA_API_KEY)" : "";
     b.onclick = () => { if (locked) return; $("intervals").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); S.interval = b.dataset.i; loadChart(); };
@@ -1182,14 +1250,21 @@ function setupIntervals() {
 }
 let lastBars = null;
 const volData = (bars) => bars.map(b => ({ time: b.time, value: b.volume || 0, color: b.close >= b.open ? "rgba(204,255,4,.3)" : "rgba(237,230,218,.16)" }));
-async function loadChart() {
-  const note = $("chart-note"); note.hidden = false; note.textContent = "Loading chart…";
+async function loadChart(silent) {
+  const note = $("chart-note"); if (!silent) { note.hidden = false; note.textContent = "Loading chart…"; }
   if (!ensureChart()) return;
   const { pool, base } = S.sel; const cfg = intervalCfg(S.interval);
-  if (pool.curve) {
-    lastBars = null; candle.setData([]); vol.setData([]);
-    const L = pool.curve, pct = Math.min(100, (L.progress || 0) * 100);
-    note.textContent = `On the Pons bonding curve · ${pct.toFixed(1)}% to graduation (${fmtNum(L.raised, 4)} / ${fmtNum(L.threshold, 4)} ${L.pairSym}). Candles start once it graduates to Uniswap.`;
+  if (pool.curve) {                                               // Pons curve: candles built from on-chain trades
+    const L = pool.curve; let trades;
+    try { trades = await curveTrades(L); }
+    catch { if (S.sel?.pool.id === pool.id && !silent) { candle.setData([]); vol.setData([]); note.textContent = "Could not read curve trades from Robinhood Chain. Retrying…"; } return; }
+    if (S.sel?.pool.id !== pool.id) return;
+    const usd = quoteUsd(L.pair) || 1;
+    const bars = curveCandles(trades, IV_SEC[S.interval] || 300, usd);
+    lastBars = bars; candle.setData(bars.map(({ volume, ...b }) => b)); vol.setData(volData(bars));
+    if (!silent) chart.timeScale().fitContent();
+    curveStats(L, trades, usd);
+    if (bars.length) note.hidden = true; else { note.hidden = false; note.textContent = "No trades on this curve yet. Be the first."; }
     return;
   }
   let rows = [], err = null;
@@ -1203,6 +1278,8 @@ async function loadChart() {
       const d = await api(`/networks/${NET()}/pools/${pool.id}/ohlcv?start=${encodeURIComponent(start)}&interval=${S.interval}&limit=${cfg.limit}&inversed=${inv}`);
       rows = Array.isArray(d) ? d : (d.data || d.ohlcv || []);
     } catch (e) { err = e; }
+    // key refused or plan too small: fall back to what works without a key (1H candles, last 24h)
+    if (err && err.status === 403 && hasKey()) { S.keyBroken = true; if (INTERVALS[S.interval].key) S.interval = "1h"; setupIntervals(); return loadChart(silent); }
   }
   if (S.sel?.pool.id !== pool.id) return;
   const bars = rows.map(r => ({ time: Math.floor(new Date(r.time_open || r.time).getTime() / 1000), open: +r.open, high: +r.high, low: +r.low, close: +r.close, volume: +r.volume || 0 }))
@@ -1360,7 +1437,7 @@ async function checkPons() {
     if (info.phase === 0) {
       const c = new ethers.Contract(info.curve, ABI.curve, p);
       const [res, sellable, feeBps, raised, thr, ready, snipe] = await Promise.all([c.getReserves(), c.sellableTokens(), c.feeBps(), c.realQuoteReserve(), c.graduationThreshold(), c.readyToGraduate(), c.currentSnipeTaxBps(S.wallet.address)]);
-      Object.assign(info, { qR: res[0], tR: res[1], sellable, feeBps: BigInt(feeBps), ready, progress: Number(raised) / Number(thr), snipeBps: BigInt(snipe) });
+      Object.assign(info, { qR: res[0], tR: res[1], sellable, feeBps: BigInt(feeBps), ready, progress: Number(raised) / Number(thr), threshold: thr, snipeBps: BigInt(snipe) });
       setVenue("curve", `Bonding curve · ${(Math.min(1, info.progress) * 100).toFixed(1)}% to graduation`, info.progress);
       $("k-pons").textContent = (Number(info.feeBps + info.creatorTaxBps) / 100).toFixed(2) + "%";
     } else if (info.phase === 2) {
@@ -1371,6 +1448,20 @@ async function checkPons() {
     S.pons = info; renderSwapStatic();
   } catch (e) { setVenue("none", "Could not read Pons contract: " + errText(e)); }
 }
+// keep curve reserves fresh while a curve token is open, so the quote follows other traders
+async function refreshCurve() {
+  const info = S.pons, sel = S.sel;
+  if (!info || info.route !== "curve" || !S.wallet || document.hidden || $("go").disabled && $("go").dataset.action === "swap") return;
+  try {
+    const c = new ethers.Contract(info.curve, ABI.curve, S.wallet.provider);
+    const [res, sellable, raised, ready, snipe] = await Promise.all([c.getReserves(), c.sellableTokens(), c.realQuoteReserve(), c.readyToGraduate(), c.currentSnipeTaxBps(S.wallet.address)]);
+    if (S.pons !== info || S.sel !== sel) return;
+    Object.assign(info, { qR: res[0], tR: res[1], sellable, ready, snipeBps: BigInt(snipe) });
+    const thr = info.threshold || 0n; if (thr > 0n) { info.progress = Number(raised) / Number(thr); setVenue("curve", `Bonding curve · ${(Math.min(1, info.progress) * 100).toFixed(1)}% to graduation`, info.progress); }
+    requestQuote();
+  } catch {}
+}
+setInterval(refreshCurve, 12000);
 // Pons v1 launches (and other tokens) trade in a Uniswap V3 pool against WETH.
 async function checkV3(sel) {
   setVenue("unknown", "Looking for a Uniswap V3 pool…");
@@ -1549,6 +1640,14 @@ $("go").onclick = async () => {
       const t = new ethers.Contract(spendToken, ABI.erc20, signer);
       if ((await t.allowance(me, S.router)) < q.amountIn) { go.textContent = "Approving token…"; showMsg("Confirm the approval in your wallet."); await (await t.approve(S.router, q.amountIn)).wait(); }
     }
+    // simulate first with the live chain state: the real output (all Pons taxes included) sets the minimum
+    go.textContent = "Checking price…";
+    const sim = info.route === "v3"
+      ? (S.side === "buy" ? router.buyV3.staticCall(S.sel.base.id, info.poolFee, 0n, deadline, { value: q.amountIn }) : router.sellV3.staticCall(S.sel.base.id, info.poolFee, q.amountIn, 0n, deadline))
+      : (S.side === "buy" ? router.buy.staticCall(S.sel.base.id, q.amountIn, 0n, deadline, { value: info.pair === ethers.ZeroAddress ? q.amountIn : 0n }) : router.sell.staticCall(S.sel.base.id, q.amountIn, 0n, deadline));
+    const fresh = BigInt(await sim);
+    if (fresh === 0n) throw new Error("The pool returned nothing for this amount.");
+    q.min = fresh * (BPS - S.slipBps) / BPS;
     go.textContent = "Confirm in wallet…"; showMsg("Confirm the transaction in your wallet.");
     let tx;
     if (info.route === "v3") {
@@ -1572,7 +1671,14 @@ $("amt").addEventListener("input", requestQuote);
 
 function errText(e) {
   const m = e?.shortMessage || e?.info?.error?.message || e?.reason || e?.message || String(e);
-  if (/user rejected|denied/i.test(m)) return "Transaction rejected in wallet.";
+  const rv = e?.revert?.name || "";
+  if (/user rejected|denied/i.test(m) || e?.code === "ACTION_REJECTED") return "Transaction rejected in wallet.";
+  if (/insufficient funds/i.test(m)) return "Not enough ETH for this amount plus gas.";
+  if (rv === "InsufficientOutput" || rv === "SlippageExceeded") return "Price moved beyond your slippage limit while confirming. Try again or raise slippage in settings.";
+  if (rv === "UnsupportedPhase") return "This token is graduating or its curve is closed right now. Try again in a minute.";
+  if (rv === "UnknownToken") return "This token is not a Pons launch.";
+  if (rv === "Expired") return "The transaction took too long and expired. Try again.";
+  if (/unknown custom error/i.test(m)) return "The Pons curve rejected this trade (price moved, anti-snipe limit or curve full). Try a smaller amount or try again.";
   if (/InsufficientOutput|SlippageExceeded/i.test(m)) return "Price moved beyond your slippage limit. Raise slippage or try again.";
   if (/NoPool/i.test(m)) return "This token has no Uniswap V3 WETH pool at that fee tier.";
   if (/Expired/i.test(m)) return "The transaction took too long and expired. Try again.";
