@@ -35,7 +35,7 @@ git push -u origin main
 | `DEXPAPRIKA_API_KEY` | recommended | `api_…` | Free key from console.dexpaprika.com. Unlocks 15m/6H/1D charts and 7 days of history, and raises rate limits. Stays on the server. |
 | `EXPLORER_URL` | no | `https://robinhoodchain.blockscout.com` | Override block explorer. |
 | `DEXPAPRIKA_API` | no | `https://api.dexpaprika.com` | Override API base. |
-| `ROADMAP_PHASE` | no | `1` | Roadmap phase that is live in the navbar (1 Trade, 2 Radar, 3 Portfolio, 4 Launch). Default 1. |
+| `ROADMAP_PHASE` | no | `1` | Roadmap phase that is live in the navbar (1 Trade, 2 Launch, 3 Radar, 4 Portfolio). Default 1. |
 | `PUBLIC_RPC_URL` | no | `https://rpc.mainnet.chain.robinhood.com` | Read-only RPC the browser uses for the Pons curve list. Public URLs only (it is visible to visitors). |
 
 The assets table has a three-way menu: **Pons curve** (Pons v2 launches still on the bonding curve, read

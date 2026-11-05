@@ -1749,12 +1749,12 @@ $("router").addEventListener("input", async (e) => {
 const PHASES = [
   { n: 1, name: "Trade", title: "The Pons DEX", lead: "Trade every Pons token in one place, from the first block on the bonding curve to the Uniswap pool after graduation.",
     feats: ["Pons curve, graduated and Uniswap tokens sorted on-chain", "Live candles and buy/sell activity from the very first curve trade", "Swaps routed through the TradePad router with an on-chain price check"] },
-  { n: 2, name: "Radar", title: "Catch launches early", lead: "A live feed of new Pons launches and the curves that are moving, so you see them before everyone else.",
-    feats: ["Real-time feed of new Pons launches", "Alerts when a curve passes 50%, 80% and graduation", "Follow creator wallets and see the first buyers of a launch"] },
-  { n: 3, name: "Portfolio", title: "Every bag, one view", lead: "Your Pons positions across the curve and Uniswap, with profit and loss per token.",
-    feats: ["All your Pons tokens in one wallet view", "Entry price, PnL and value per token", "Graduation watch for the curves you hold"] },
-  { n: 4, name: "Launch", title: "Launch from TradePad", lead: "Start a Pons launch from the TradePad interface and share a live page for it.",
+  { n: 2, name: "Launch", title: "Launch from TradePad", lead: "Start a Pons launch from the TradePad interface and share a live page for it.",
     feats: ["Create a Pons launch with name, ticker and image", "A shareable launch page with the live curve and chart", "Launch stats for creators: holders, volume, graduation progress"] },
+  { n: 3, name: "Radar", title: "Catch launches early", lead: "A live feed of new Pons launches and the curves that are moving, so you see them before everyone else.",
+    feats: ["Real-time feed of new Pons launches", "Alerts when a curve passes 50%, 80% and graduation", "Follow creator wallets and see the first buyers of a launch"] },
+  { n: 4, name: "Portfolio", title: "Every bag, one view", lead: "Your Pons positions across the curve and Uniswap, with profit and loss per token.",
+    feats: ["All your Pons tokens in one wallet view", "Entry price, PnL and value per token", "Graduation watch for the curves you hold"] },
 ];
 const LIVE_PHASE = Math.max(1, Math.min(PHASES.length, Number(CONFIG.PHASE) || 1));
 const phState = (n) => n <= LIVE_PHASE ? "live" : n === LIVE_PHASE + 1 ? "next" : "soon";
