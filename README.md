@@ -57,20 +57,48 @@ Static hosts (Netlify drop, Cloudflare Pages upload) have no server, so the page
 sample data there. Use Railway (or any Node host) for live data.
 
 ## 3. Deploy the router contract (from your own computer, not Railway)
-```bash
-forge install foundry-rs/forge-std
-forge test
-# verify addresses in script/Deploy.s.sol on https://robinhoodchain.blockscout.com first
-FEE_RECIPIENT=0xYourWallet FEE_BPS=50 forge script script/Deploy.s.sol \
-  --rpc-url $RPC_URL --private-key $PK --broadcast
-```
-Then put the printed address into Railway's `ROUTER_ADDRESS`.
+The router supports:
+- **Pons v1 launches** (most live Pons tokens): Uniswap V3 pool against WETH, 1% fee tier.
+- **Pons v2 launches**: bonding curve, then the Uniswap v4 pool with the pons hook.
+- Any other token with a Uniswap V3 WETH pool.
 
-Withdraw fees with `withdrawFees(0x0000000000000000000000000000000000000000)` for ETH (or the pair token address), or use the "Withdraw fees" button on the Revenue card while connected as the owner.
+Local values (put them in your terminal only; never on Railway or GitHub):
+
+| Variable | Example | What it is |
+|---|---|---|
+| `RPC_URL` | `https://rpc.mainnet.chain.robinhood.com` | Public Robinhood Chain RPC (from the Pons docs) |
+| `FEE_RECIPIENT` | `0xYourWallet` | Wallet that receives the frontend fees when you withdraw |
+| `FEE_BPS` | `50` | Frontend fee: 50 = 0.5% (max 100 = 1%) |
+| private key | asked by `deploy.sh` (hidden, not saved) | Deployer wallet with a little ETH on Robinhood Chain. It becomes the router **owner** (withdraw fees, change fee). |
+
+Windows: open **Git Bash** and paste this one line (it unzips, installs Foundry if needed, runs the
+tests, asks for the fee wallet and fee, then asks for the deployer private key without saving it):
+```bash
+cd ~/Downloads && { unzip -oq tradepad.zip || powershell.exe -NoProfile -Command "Expand-Archive -Force tradepad.zip ."; } && bash tradepad/deploy.sh
+```
+The router address is printed, copied to the clipboard and saved in `tradepad/router-address.txt`.
+
+Manual alternative:
+```bash
+forge install foundry-rs/forge-std --no-git && forge test
+export RPC_URL=https://rpc.mainnet.chain.robinhood.com FEE_RECIPIENT=0xYourWallet FEE_BPS=50
+forge script script/Deploy.s.sol --rpc-url $RPC_URL --interactives 1 --broadcast
+```
+In the manual alternative, `--interactives 1` asks for the private key (on Windows terminals that prompt may not show; use `deploy.sh`).
+The script first checks every address on-chain (Pons v2 factory, v4 PoolManager, SwapRouter02, its WETH
+and V3 factory) and stops without deploying if anything does not match. It prints the router address.
+
+Then on Railway set `ROUTER_ADDRESS` to that address (and `DEFAULT_FEE_BPS` to the same value as
+`FEE_BPS`). Railway redeploys and the swap box starts working.
+
+Withdraw fees: connect the owner wallet on the site and use "Withdraw fees" on the Revenue card,
+or call `withdrawFees(0x0000000000000000000000000000000000000000)`. To move ownership to another
+wallet: `transferOwnership(newOwner)` from the owner, then `acceptOwnership()` from the new wallet.
 
 ## Important notes
 - The contract is NOT AUDITED, and Pons v2 itself has not finished its audits. Test on a fork first (`anvil --fork-url $RPC_URL`) with small amounts.
 - For v4 pools the frontend quote is an estimate from DexPaprika prices; the router enforces the minimum output on-chain. For production, add an on-chain v4 quoter.
-- The router only supports Pons v2 tokens. Pons v1 / non-Pons tokens are marked "not supported".
+- Tokens with no Pons v2 launch and no Uniswap V3 WETH pool (for example USDG-only pools) are marked "not supported".
+- Pons v1 launch protection: in the first blocks after a launch, each wallet can hold at most 5% of supply. Buys above that revert.
 - Launching new tokens on Pons v2 is currently limited to whitelisted addresses (`canLaunch`).
 - A value saved in the swap Settings (browser) overrides `ROUTER_ADDRESS` for that browser.

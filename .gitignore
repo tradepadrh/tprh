@@ -12,3 +12,4 @@ lib/
 # node / os
 node_modules/
 .DS_Store
+router-address.txt

@@ -15,10 +15,10 @@ contract MockERC20 {
 
     function mint(address to, uint256 a) external { balanceOf[to] += a; }
     function approve(address s, uint256 a) external returns (bool) { allowance[msg.sender][s] = a; return true; }
-    function transfer(address to, uint256 a) external returns (bool) {
+    function transfer(address to, uint256 a) external virtual returns (bool) {
         balanceOf[msg.sender] -= a; balanceOf[to] += a; return true;
     }
-    function transferFrom(address f, address to, uint256 a) external returns (bool) {
+    function transferFrom(address f, address to, uint256 a) external virtual returns (bool) {
         allowance[f][msg.sender] -= a; balanceOf[f] -= a; balanceOf[to] += a; return true;
     }
 }
@@ -103,6 +103,58 @@ contract MockPoolManager {
     }
 }
 
+
+// ---- Uniswap V3 mocks ----
+contract MockWETH {
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    receive() external payable { balanceOf[msg.sender] += msg.value; }
+    function deposit() external payable { balanceOf[msg.sender] += msg.value; }
+    function withdraw(uint256 a) external { balanceOf[msg.sender] -= a; payable(msg.sender).transfer(a); }
+    function approve(address s, uint256 a) external returns (bool) { allowance[msg.sender][s] = a; return true; }
+    function transfer(address to, uint256 a) external returns (bool) { balanceOf[msg.sender] -= a; balanceOf[to] += a; return true; }
+    function transferFrom(address f, address to, uint256 a) external returns (bool) {
+        allowance[f][msg.sender] -= a; balanceOf[f] -= a; balanceOf[to] += a; return true;
+    }
+}
+
+/// Token that burns `taxBps` of every transfer (to test balance-delta accounting).
+contract TaxToken is MockERC20 {
+    uint256 public taxBps;
+    constructor(uint256 t) MockERC20("TAX") { taxBps = t; }
+    function _cut(uint256 a) internal view returns (uint256) { return a - a * taxBps / 10000; }
+    function transfer(address to, uint256 a) external override returns (bool) { balanceOf[msg.sender] -= a; balanceOf[to] += _cut(a); return true; }
+    function transferFrom(address f, address to, uint256 a) external override returns (bool) {
+        allowance[f][msg.sender] -= a; balanceOf[f] -= a; balanceOf[to] += _cut(a); return true;
+    }
+}
+
+contract MockV3Factory {
+    mapping(bytes32 => address) internal pools;
+    function setPool(address a, address b, uint24 fee, address p) external { pools[keccak256(abi.encode(a, b, fee))] = p; pools[keccak256(abi.encode(b, a, fee))] = p; }
+    function getPool(address a, address b, uint24 fee) external view returns (address) { return pools[keccak256(abi.encode(a, b, fee))]; }
+}
+
+/// SwapRouter02 stand-in: 1 WETH = 1000 tokens. Pulls tokenIn from the caller, pays tokenOut to recipient.
+contract MockSwapRouter {
+    MockWETH public weth;
+    uint24 public lastFee;
+    constructor(MockWETH w) { weth = w; }
+    function exactInputSingle(ISwapRouter02.ExactInputSingleParams calldata p) external payable returns (uint256 out) {
+        lastFee = p.fee;
+        if (p.tokenIn == address(weth)) {
+            weth.transferFrom(msg.sender, address(this), p.amountIn);
+            out = p.amountIn * 1000;
+            MockERC20(p.tokenOut).mint(address(this), out);
+            MockERC20(p.tokenOut).transfer(p.recipient, out); // a taxed token delivers less than `out`
+        } else {
+            MockERC20(p.tokenIn).transferFrom(msg.sender, address(this), p.amountIn);
+            out = p.amountIn / 1000;
+            weth.transfer(p.recipient, out);
+        }
+    }
+}
+
 // ------------------------------------------------------------------ tests
 
 contract PonsRouterTest is Test {
@@ -114,12 +166,23 @@ contract PonsRouterTest is Test {
     address hook = address(0xBEEF);
     address feeTo = address(0xFEE);
     address user = address(0xA11CE);
+    MockWETH weth;
+    MockV3Factory v3f;
+    MockSwapRouter sr;
+    MockERC20 v1tok;
 
     function setUp() public {
         factory = new MockFactory();
         pm = new MockPoolManager();
         vm.deal(address(pm), 100 ether);
-        router = new PonsRouter(address(factory), address(pm), hook, feeTo, 50); // 0.5%
+        weth = new MockWETH();
+        v3f = new MockV3Factory();
+        sr = new MockSwapRouter(weth);
+        vm.deal(address(this), 50 ether);
+        weth.deposit{value: 50 ether}(); weth.transfer(address(sr), 50 ether);   // router liquidity for sells
+        router = new PonsRouter(address(factory), address(pm), hook, address(sr), address(v3f), address(weth), feeTo, 50); // 0.5%
+        v1tok = new MockERC20("V1");
+        v3f.setPool(address(v1tok), address(weth), 10000, address(0xB001));
         tok = new MockERC20("MEME");
         curve = new MockCurve(tok, address(0));
         vm.deal(address(curve), 100 ether);
@@ -256,5 +319,84 @@ contract PonsRouterTest is Test {
     function test_unlockCallbackOnlyPoolManager() public {
         vm.expectRevert(PonsRouter.NotPoolManager.selector);
         router.unlockCallback("");
+    }
+
+    // ---------------- Uniswap V3 route (Pons v1) ----------------
+    function test_buyV3_takesFeeWrapsAndSwaps() public {
+        vm.prank(user);
+        uint256 out = router.buyV3{value: 1 ether}(address(v1tok), 10000, 990 ether, block.timestamp);
+        assertEq(out, 995 ether);
+        assertEq(v1tok.balanceOf(user), 995 ether);
+        assertEq(sr.lastFee(), 10000);
+        assertEq(router.feesAccrued(address(0)), 0.005 ether);
+        assertEq(address(router).balance, 0.005 ether, "only the fee stays in the router");
+        assertEq(weth.balanceOf(address(router)), 0);
+        assertEq(weth.allowance(address(router), address(sr)), 0);
+    }
+
+    function test_buyV3_revertsBelowMin() public {
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(PonsRouter.InsufficientOutput.selector, 995 ether, 996 ether));
+        router.buyV3{value: 1 ether}(address(v1tok), 10000, 996 ether, block.timestamp);
+    }
+
+    function test_buyV3_revertsWithoutPool() public {
+        vm.prank(user);
+        vm.expectRevert(PonsRouter.NoPool.selector);
+        router.buyV3{value: 1 ether}(address(v1tok), 3000, 0, block.timestamp);   // wrong fee tier
+        vm.prank(user);
+        vm.expectRevert(PonsRouter.NoPool.selector);
+        router.buyV3{value: 1 ether}(address(weth), 10000, 0, block.timestamp);
+    }
+
+    function test_sellV3_unwrapsAndTakesFee() public {
+        v1tok.mint(user, 1000 ether);
+        vm.startPrank(user);
+        v1tok.approve(address(router), 1000 ether);
+        uint256 balBefore = user.balance;
+        uint256 out = router.sellV3(address(v1tok), 10000, 1000 ether, 0.99 ether, block.timestamp);
+        vm.stopPrank();
+        assertEq(out, 0.995 ether);
+        assertEq(user.balance - balBefore, 0.995 ether);
+        assertEq(router.feesAccrued(address(0)), 0.005 ether);
+        assertEq(v1tok.allowance(address(router), address(sr)), 0);
+    }
+
+    function test_sellV3_revertsBelowMin() public {
+        v1tok.mint(user, 1000 ether);
+        vm.startPrank(user);
+        v1tok.approve(address(router), 1000 ether);
+        vm.expectRevert(abi.encodeWithSelector(PonsRouter.InsufficientOutput.selector, 0.995 ether, 1 ether));
+        router.sellV3(address(v1tok), 10000, 1000 ether, 1 ether, block.timestamp);
+        vm.stopPrank();
+    }
+
+    function test_v3_taxTokenUsesRealBalances() public {
+        TaxToken tt = new TaxToken(1000); // 10% transfer tax
+        v3f.setPool(address(tt), address(weth), 10000, address(0xB002));
+        // buy: the pool sends 995 but the buyer only receives 895.5 after tax -> minOut is checked on 895.5
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(PonsRouter.InsufficientOutput.selector, 895.5 ether, 900 ether));
+        router.buyV3{value: 1 ether}(address(tt), 10000, 900 ether, block.timestamp);
+        vm.prank(user);
+        uint256 got = router.buyV3{value: 1 ether}(address(tt), 10000, 895 ether, block.timestamp);
+        assertEq(got, 895.5 ether);
+        assertEq(tt.balanceOf(user), 895.5 ether);
+        // sell: user sends 1000, router receives 900 after tax and only swaps what it got
+        tt.mint(user, 1000 ether);
+        vm.startPrank(user);
+        tt.approve(address(router), 1000 ether);
+        uint256 out = router.sellV3(address(tt), 10000, 1000 ether, 0, block.timestamp);
+        vm.stopPrank();
+        assertEq(out, 0.9 ether - 0.0045 ether);   // only the 900 tokens that arrived were swapped
+    }
+
+    function test_feesFromBothRoutesWithdrawTogether() public {
+        vm.startPrank(user);
+        router.buy{value: 1 ether}(address(tok), 1 ether, 0, block.timestamp);
+        router.buyV3{value: 1 ether}(address(v1tok), 10000, 0, block.timestamp);
+        vm.stopPrank();
+        router.withdrawFees(address(0));
+        assertEq(feeTo.balance, 0.01 ether);
     }
 }

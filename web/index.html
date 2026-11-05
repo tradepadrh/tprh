@@ -182,7 +182,7 @@ a { color: inherit; }
 .venue-tag { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 99px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
 .venue-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .venue-tag[data-k="curve"] { color: var(--warn); } .venue-tag[data-k="curve"] i { background: var(--warn); }
-.venue-tag[data-k="pool"] { color: var(--up); } .venue-tag[data-k="pool"] i { background: var(--up); }
+.venue-tag[data-k="pool"], .venue-tag[data-k="v3"] { color: var(--up); } .venue-tag[data-k="pool"] i, .venue-tag[data-k="v3"] i { background: var(--up); }
 .venue-tag[data-k="none"] i { background: var(--down); }
 #chart { height: 380px; position: relative; margin: 6px 6px 10px; }
 @media (max-width: 560px) { #chart { height: 290px; } }
@@ -209,7 +209,7 @@ th.r, td.r { text-align: right; }
 .venue { display: grid; gap: 7px; font-size: 12px; padding: 11px 14px; border-radius: 18px; background: var(--soft); border: 1px solid var(--line); }
 .venue-l { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--faint); }
-.venue[data-k="curve"] .dot { background: var(--warn); } .venue[data-k="pool"] .dot { background: var(--up); } .venue[data-k="none"] .dot { background: var(--down); }
+.venue[data-k="curve"] .dot { background: var(--warn); } .venue[data-k="pool"] .dot, .venue[data-k="v3"] .dot { background: var(--up); } .venue[data-k="none"] .dot { background: var(--down); }
 .prog { height: 6px; border-radius: 6px; background: var(--soft); overflow: hidden; }
 .prog i { display: block; height: 100%; background: linear-gradient(90deg, var(--warn), var(--volt)); }
 .box { border: 1px solid var(--line); background: rgba(0, 0, 0, .14); border-radius: 20px; padding: 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
@@ -508,7 +508,10 @@ const CONFIG = {
   NETWORK_HINT: "robinhood",
   CHAIN_ID: 4663,
   EXPLORER: "https://robinhoodchain.blockscout.com",
-  PONS_FACTORY: "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
+  PONS_FACTORY: "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",   // Pons v2
+  V3_FACTORY: "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",     // Uniswap V3 (Pons v1 pools live here)
+  QUOTER_V2: "0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7",
+  V3_FEES: [10000, 3000, 500, 100],                            // Pons v1 uses 10000 (1%), checked first
   ROUTER: "",              // set after deploying, or via Settings
   DEFAULT_FEE_BPS: 50,
   TABLE_ROWS: 20,
@@ -550,9 +553,15 @@ const ABI = {
     "function withdrawFees(address asset)",
     "function buy(address token,uint256 quoteIn,uint256 minTokensOut,uint256 deadline) payable returns (uint256)",
     "function sell(address token,uint256 tokensIn,uint256 minQuoteOut,uint256 deadline) returns (uint256)",
+    "function buyV3(address token,uint24 poolFee,uint256 minTokensOut,uint256 deadline) payable returns (uint256)",
+    "function sellV3(address token,uint24 poolFee,uint256 tokensIn,uint256 minEthOut,uint256 deadline) returns (uint256)",
     "event Bought(address indexed user, address indexed token, uint8 phase, uint256 quoteIn, uint256 frontendFee, uint256 tokensOut)",
     "event Sold(address indexed user, address indexed token, uint8 phase, uint256 tokensIn, uint256 frontendFee, uint256 quoteOut)",
   ],
+  v3factory: ["function getPool(address,address,uint24) view returns (address)"],
+  v3pool: ["function liquidity() view returns (uint128)"],
+  quoter: ["function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut,uint160 sqrtPriceX96After,uint32 initializedTicksCrossed,uint256 gasEstimate)"],
+  ponsV1Token: ["function liquidityPool() view returns (address)"],
 };
 
 // ======================= STATE =======================
@@ -983,7 +992,7 @@ async function connect() {
     await eth.request({ method: "eth_requestAccounts" });
     try { await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x" + CONFIG.CHAIN_ID.toString(16) }] }); }
     catch (e) { if (e.code === 4902) { showMsg("Add Robinhood Chain (chain id 4663) to your wallet first, then connect again.", "err"); return; } }
-    const provider = new ethers.BrowserProvider(eth); const signer = await provider.getSigner();
+    const provider = new ethers.BrowserProvider(eth); provider.pollingInterval = 1200; const signer = await provider.getSigner();
     S.wallet = { provider, signer, address: await signer.getAddress() };
     $("w-t").textContent = short(S.wallet.address);
     $("w-av").outerHTML = avHTML(S.wallet.address.slice(2, 5), S.wallet.address).replace('class="av"', 'class="av" id="w-av"');
@@ -1049,9 +1058,11 @@ async function checkPons() {
   setVenue("unknown", "Checking Pons v2 launch…");
   try {
     const p = S.wallet.provider; const f = new ethers.Contract(CONFIG.PONS_FACTORY, ABI.factory, p);
-    const l = await f.getLaunchedToken(sel.base.id); if (S.sel !== sel) return;
-    if (!l.exists) { S.pons = { exists: false }; setVenue("none", "Not a Pons v2 launch · not supported by the router"); $("k-pons").textContent = "—"; renderSwapStatic(); return; }
+    let l = null; try { l = await f.getLaunchedToken(sel.base.id); } catch {}
+    if (S.sel !== sel) return;
+    if (!l || !l.exists) return checkV3(sel);
     const info = { exists: true, phase: Number(l.phase), curve: l.curve, pair: l.pairToken, creatorTaxBps: BigInt(l.creatorTaxBps) };
+    info.route = info.phase === 0 ? "curve" : info.phase === 2 ? "v4" : null;
     const native = info.pair === ethers.ZeroAddress;
     const qt = native ? null : new ethers.Contract(info.pair, ABI.erc20, p); const tk = new ethers.Contract(sel.base.id, ABI.erc20, p);
     [info.quoteDec, info.quoteSym, info.tokenDec] = await Promise.all([native ? 18 : qt.decimals().then(Number), native ? "ETH" : qt.symbol(), tk.decimals().then(Number)]);
@@ -1069,9 +1080,34 @@ async function checkPons() {
     S.pons = info; renderSwapStatic();
   } catch (e) { setVenue("none", "Could not read Pons contract: " + errText(e)); }
 }
+// Pons v1 launches (and other tokens) trade in a Uniswap V3 pool against WETH.
+async function checkV3(sel) {
+  setVenue("unknown", "Looking for a Uniswap V3 pool…");
+  const p = S.wallet.provider;
+  const f = new ethers.Contract(CONFIG.V3_FACTORY, ABI.v3factory, p);
+  for (const fee of CONFIG.V3_FEES) {
+    let pool = ethers.ZeroAddress;
+    try { pool = await f.getPool(sel.base.id, WETH, fee); } catch {}
+    if (S.sel !== sel) return;
+    if (pool === ethers.ZeroAddress) continue;
+    let liq = 0n; try { liq = await new ethers.Contract(pool, ABI.v3pool, p).liquidity(); } catch {}
+    if (liq === 0n) continue;
+    let tokenDec = 18; try { tokenDec = Number(await new ethers.Contract(sel.base.id, ABI.erc20, p).decimals()); } catch {}
+    let ponsV1 = false; try { ponsV1 = lc(await new ethers.Contract(sel.base.id, ABI.ponsV1Token, p).liquidityPool()) === lc(pool); } catch {}
+    if (S.sel !== sel) return;
+    const pct = (fee / 10000).toFixed(fee % 100 ? 2 : 0) + "%";
+    S.pons = { exists: true, route: "v3", poolFee: fee, pool, pair: ethers.ZeroAddress, quoteSym: "ETH", quoteDec: 18, tokenDec, ponsV1, poolBps: BigInt(fee / 100) };
+    setVenue("v3", ponsV1 ? `Pons v1 · Uniswap V3 pool (${pct})` : `Uniswap V3 · WETH pool (${pct})`);
+    $("k-pons").textContent = pct;
+    S.v3q = null; renderSwapStatic(); return;
+  }
+  S.pons = { exists: false };
+  setVenue("none", "No Pons v2 launch or Uniswap V3 WETH pool for this token");
+  $("k-pons").textContent = "—"; renderSwapStatic();
+}
 function setVenue(k, text, prog) {
   $("venue").dataset.k = k; $("venue-t").textContent = text; $("venue-tag").dataset.k = k;
-  $("venue-tag-t").textContent = { curve: "Bonding curve Pons", pool: "Uniswap v4 · pons", none: "Not supported by router", unknown: "Route not checked" }[k];
+  $("venue-tag-t").textContent = { curve: "Bonding curve Pons", pool: "Uniswap v4 · pons", v3: S.pons?.ponsV1 ? "Pons v1 · Uniswap V3" : "Uniswap V3", none: "Not supported by router", unknown: "Route not checked" }[k];
   $("prog").hidden = prog === undefined; if (prog !== undefined) $("prog-i").style.width = Math.min(100, prog * 100) + "%";
 }
 
@@ -1119,19 +1155,47 @@ function curveBuy(info, quoteIn) {
 }
 function curveSell(info, tokensIn) { const g = amountOut(tokensIn, info.tR, info.qR); return g - g * info.feeBps / BPS - g * info.creatorTaxBps / BPS; }
 
+// Exact Uniswap V3 quotes from QuoterV2 (async): computeQuote returns the cached result or starts a request.
+let v3Timer = null;
+function v3Quote(raw) {
+  const info = S.pons, key = `${S.sel.base.id}|${S.side}|${raw}|${S.routerFeeBps}|${S.slipBps}`;
+  if (S.v3q && S.v3q.key === key) return S.v3q.res;
+  clearTimeout(v3Timer);
+  v3Timer = setTimeout(async () => {
+    const fee = S.routerFeeBps, base = S.sel.base.id;
+    try {
+      const q = new ethers.Contract(CONFIG.QUOTER_V2, ABI.quoter, S.wallet.provider);
+      let res;
+      if (S.side === "buy") {
+        const qIn = ethers.parseUnits(raw, 18), f = qIn * fee / BPS, net = qIn - f;
+        const [out] = await q.quoteExactInputSingle.staticCall({ tokenIn: WETH, tokenOut: base, amountIn: net, fee: info.poolFee, sqrtPriceLimitX96: 0 });
+        res = { exact: true, kind: "pool quote", amountIn: qIn, out, outFmt: ethers.formatUnits(out, info.tokenDec), frontendFee: f, feeDec: 18, ponsBps: info.poolBps, snipeBps: 0n, min: out * (BPS - S.slipBps) / BPS };
+      } else {
+        const tIn = ethers.parseUnits(raw, info.tokenDec);
+        const [gross] = await q.quoteExactInputSingle.staticCall({ tokenIn: base, tokenOut: WETH, amountIn: tIn, fee: info.poolFee, sqrtPriceLimitX96: 0 });
+        const f = gross * fee / BPS, out = gross - f;
+        res = { exact: true, kind: "pool quote", amountIn: tIn, out, outFmt: ethers.formatUnits(out, 18), frontendFee: f, feeDec: 18, ponsBps: info.poolBps, snipeBps: 0n, min: out * (BPS - S.slipBps) / BPS };
+      }
+      S.v3q = { key, res };
+    } catch (e) { S.v3q = { key, res: { error: "No quote: the pool may not have enough liquidity for this amount." } }; }
+    if (S.pons === info) requestQuote();
+  }, 250);
+  return { estimate: true, outFmt: null, pending: true };
+}
 function computeQuote() {
   const raw = $("amt").value.replace(",", ".").trim();
   if (!raw || !(Number(raw) > 0)) return null;
   const fee = S.routerFeeBps, info = S.pons;
+  if (info?.route === "v3" && S.wallet) { try { ethers.parseUnits(raw, S.side === "buy" ? 18 : info.tokenDec); } catch { return { error: "Invalid amount." }; } return v3Quote(raw); }
   try {
     if (info?.exists && info.phase === 0) {
       if (S.side === "buy") {
         const qIn = ethers.parseUnits(raw, info.quoteDec), f = qIn * fee / BPS, net = qIn - f, r = curveBuy(info, net);
-        return { exact: true, amountIn: qIn, out: r.out, outFmt: ethers.formatUnits(r.out, info.tokenDec), frontendFee: f, feeDec: info.quoteDec, ponsBps: info.feeBps + info.creatorTaxBps, snipeBps: r.snipe, refund: net - r.spent, min: r.out * (BPS - S.slipBps) / BPS };
+        return { exact: true, kind: "curve quote", amountIn: qIn, out: r.out, outFmt: ethers.formatUnits(r.out, info.tokenDec), frontendFee: f, feeDec: info.quoteDec, ponsBps: info.feeBps + info.creatorTaxBps, snipeBps: r.snipe, refund: net - r.spent, min: r.out * (BPS - S.slipBps) / BPS };
       }
       if (info.ready) return { error: "The curve is full. Selling reopens after graduation." };
       const tIn = ethers.parseUnits(raw, info.tokenDec), g = curveSell(info, tIn), f = g * fee / BPS, out = g - f;
-      return { exact: true, amountIn: tIn, out, outFmt: ethers.formatUnits(out, info.quoteDec), frontendFee: f, feeDec: info.quoteDec, ponsBps: info.feeBps + info.creatorTaxBps, snipeBps: 0n, min: out * (BPS - S.slipBps) / BPS };
+      return { exact: true, kind: "curve quote", amountIn: tIn, out, outFmt: ethers.formatUnits(out, info.quoteDec), frontendFee: f, feeDec: info.quoteDec, ponsBps: info.feeBps + info.creatorTaxBps, snipeBps: 0n, min: out * (BPS - S.slipBps) / BPS };
     }
   } catch { return { error: "Invalid amount." }; }
   const pb = S.prices[lc(S.sel.base.id)], pq = S.prices[lc(S.sel.quote.id)];
@@ -1148,11 +1212,12 @@ function computeQuote() {
 }
 function requestQuote() { const q = computeQuote(); renderQuote(q); renderButton(q); }
 function renderQuote(q) {
-  $("out-kind").textContent = q?.estimate ? "estimate" : (q?.exact ? "curve quote" : "");
+  $("out-kind").textContent = q?.pending ? "quoting…" : q?.estimate ? "estimate" : (q?.exact ? q.kind : "");
   if (!q || q.error) { $("out").textContent = "0.0"; $("lines").innerHTML = q?.error ? `<div><dt class="down">${esc(q.error)}</dt></div>` : feeLine(); return; }
   $("out").textContent = q.outFmt == null ? "—" : fmtNum(q.outFmt, 6);
   const outSym = S.side === "buy" ? (S.sel.base.symbol || "") : quoteSym();
-  let h = feeLine(q) + `<div><dt>Fee Pons + creator</dt><dd>${(Number(q.ponsBps ?? 100n) / 100).toFixed(2)}%${q.exact ? "" : " (approx.)"}</dd></div>`;
+  const feeLabel = S.pons?.route === "v3" ? "Pool fee (creator + Pons)" : "Fee Pons + creator";
+  let h = feeLine(q) + `<div><dt>${feeLabel}</dt><dd>${(Number(q.ponsBps ?? 100n) / 100).toFixed(2)}%${q.exact ? "" : " (approx.)"}</dd></div>`;
   if (q.snipeBps > 0n) h += `<div><dt class="down">Anti-snipe tax active</dt><dd class="down">${(Number(q.snipeBps) / 100).toFixed(1)}%</dd></div>`;
   if (q.refund > 0n) h += `<div><dt>Refunded (curve full)</dt><dd>${fmtNum(ethers.formatUnits(q.refund, q.feeDec), 6)} ${esc(quoteSym())}</dd></div>`;
   if (q.min !== undefined) h += `<div><dt>Minimum received</dt><dd>${fmtNum(ethers.formatUnits(q.min, S.side === "buy" ? S.pons.tokenDec : S.pons.quoteDec), 6)} ${esc(outSym)}</dd></div>`;
@@ -1169,9 +1234,10 @@ function renderButton(q) {
   if (!ethers.isAddress(S.router)) return set("Add router address in settings", "settings");
   if (!S.pons) return set("Checking route…", "", true);
   if (!S.pons.exists) return set("Token not supported by router", "", true);
-  if (![0, 2].includes(S.pons.phase)) return set("Trading temporarily closed", "", true);
+  if (!S.pons.route) return set("Trading temporarily closed", "", true);
   if (!q) return set("Enter an amount", "", true);
   if (q.error) return set("Cannot process", "", true);
+  if (q.pending) return set("Getting quote…", "", true);
   if (q.min === undefined || q.amountIn === undefined) return set("Quote not available yet", "", true);
   set(`${S.side === "buy" ? "Buy" : "Sell"} ${S.sel.base.symbol || ""}`, "swap");
 }
@@ -1193,14 +1259,21 @@ $("go").onclick = async () => {
       if ((await t.allowance(me, S.router)) < q.amountIn) { go.textContent = "Approving token…"; showMsg("Confirm the approval in your wallet."); await (await t.approve(S.router, q.amountIn)).wait(); }
     }
     go.textContent = "Confirm in wallet…"; showMsg("Confirm the transaction in your wallet.");
-    const tx = S.side === "buy"
-      ? await router.buy(S.sel.base.id, q.amountIn, q.min, deadline, { value: info.pair === ethers.ZeroAddress ? q.amountIn : 0n })
-      : await router.sell(S.sel.base.id, q.amountIn, q.min, deadline);
+    let tx;
+    if (info.route === "v3") {
+      tx = S.side === "buy"
+        ? await router.buyV3(S.sel.base.id, info.poolFee, q.min, deadline, { value: q.amountIn })
+        : await router.sellV3(S.sel.base.id, info.poolFee, q.amountIn, q.min, deadline);
+    } else {
+      tx = S.side === "buy"
+        ? await router.buy(S.sel.base.id, q.amountIn, q.min, deadline, { value: info.pair === ethers.ZeroAddress ? q.amountIn : 0n })
+        : await router.sell(S.sel.base.id, q.amountIn, q.min, deadline);
+    }
     go.textContent = "Waiting for confirmation…";
     showMsg(`Submitted: <a href="${CONFIG.EXPLORER}/tx/${tx.hash}" target="_blank" rel="noopener">${short(tx.hash)}</a>`, "", true);
     await tx.wait();
     showMsg(`Swap complete. <a href="${CONFIG.EXPLORER}/tx/${tx.hash}" target="_blank" rel="noopener">View transaction</a>`, "ok", true);
-    $("amt").value = ""; checkPons(); updateBalance(); refreshWallet(); readRouter();
+    $("amt").value = ""; S.v3q = null; checkPons(); updateBalance(); refreshWallet(); readRouter();
   } catch (e) { showMsg(errText(e), "err"); }
   finally { requestQuote(); }
 };
@@ -1210,6 +1283,8 @@ function errText(e) {
   const m = e?.shortMessage || e?.info?.error?.message || e?.reason || e?.message || String(e);
   if (/user rejected|denied/i.test(m)) return "Transaction rejected in wallet.";
   if (/InsufficientOutput|SlippageExceeded/i.test(m)) return "Price moved beyond your slippage limit. Raise slippage or try again.";
+  if (/NoPool/i.test(m)) return "This token has no Uniswap V3 WETH pool at that fee tier.";
+  if (/Expired/i.test(m)) return "The transaction took too long and expired. Try again.";
   return m.length > 220 ? m.slice(0, 220) + "…" : m;
 }
 function showMsg(t, k, html) { const m = $("msg"); m.hidden = false; m.className = "msg" + (k ? " " + k : ""); if (html) m.innerHTML = t; else m.textContent = t; }

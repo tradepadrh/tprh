@@ -4,9 +4,14 @@ pragma solidity ^0.8.26;
 /*
  * PonsRouter
  * ----------
- * Router with a frontend fee for tokens launched through Pons v2 on Robinhood Chain (chain id 4663).
+ * Router with a frontend fee for Pons tokens on Robinhood Chain (chain id 4663).
  *
- * Flow:
+ * Routes:
+ *   - Pons v2 launches (buy / sell): bonding curve or the Uniswap v4 pool with the pons hook (see below).
+ *   - Pons v1 launches and other WETH pairs (buyV3 / sellV3): the token's Uniswap V3 pool via SwapRouter02.
+ *     Pons v1 pools pair every token with WETH at the 1% fee tier (10000).
+ *
+ * v2 flow:
  *   - Read the launch phase from the Pons factory (getLaunchedToken(token).phase)
  *       phase 0 (NotGraduated) -> trade directly against the bonding curve
  *       phase 2 (PoolCreated)  -> swap in the Uniswap v4 pool (pons hook, pool fee = 0)
@@ -84,6 +89,30 @@ interface IUnlockCallback {
     function unlockCallback(bytes calldata data) external returns (bytes memory);
 }
 
+// ---- Uniswap V3 (minimal) ----
+interface IUniswapV3Factory {
+    function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool);
+}
+
+interface ISwapRouter02 {
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
+
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+}
+
+interface IWETH9 {
+    function deposit() external payable;
+    function withdraw(uint256 amount) external;
+}
+
 contract PonsRouter is IUnlockCallback {
     // ---------- constants ----------
     uint256 public constant BPS = 10_000;
@@ -94,11 +123,15 @@ contract PonsRouter is IUnlockCallback {
 
     uint8 internal constant PHASE_CURVE = 0;
     uint8 internal constant PHASE_POOL = 2;
+    uint8 public constant ROUTE_V3 = 100; // "phase" value in Bought/Sold events for Uniswap V3 trades
 
     // ---------- configuration ----------
     IPonsFactory public immutable factory;
     IPoolManager public immutable poolManager;
     address public immutable memeHook;
+    ISwapRouter02 public immutable swapRouter;
+    IUniswapV3Factory public immutable v3Factory;
+    address public immutable weth;
 
     address public owner;
     address public pendingOwner;
@@ -131,6 +164,7 @@ contract PonsRouter is IUnlockCallback {
     error ValueMismatch();
     error InsufficientOutput(uint256 got, uint256 minOut);
     error TransferFailed();
+    error NoPool();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -149,11 +183,23 @@ contract PonsRouter is IUnlockCallback {
         _;
     }
 
-    constructor(address _factory, address _poolManager, address _memeHook, address _feeRecipient, uint16 _feeBps) {
+    constructor(
+        address _factory,
+        address _poolManager,
+        address _memeHook,
+        address _swapRouter,
+        address _v3Factory,
+        address _weth,
+        address _feeRecipient,
+        uint16 _feeBps
+    ) {
         if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
         factory = IPonsFactory(_factory);
         poolManager = IPoolManager(_poolManager);
         memeHook = _memeHook;
+        swapRouter = ISwapRouter02(_swapRouter);
+        v3Factory = IUniswapV3Factory(_v3Factory);
+        weth = _weth;
         owner = msg.sender;
         feeRecipient = _feeRecipient;
         feeBps = _feeBps;
@@ -276,6 +322,83 @@ contract PonsRouter is IUnlockCallback {
     }
 
     // =====================================================================
+    //                    UNISWAP V3 (Pons v1 and WETH pairs)
+    // =====================================================================
+
+    /// The Uniswap V3 pool for token/WETH at a fee tier, or address(0).
+    function v3Pool(address token, uint24 poolFee) public view returns (address) {
+        return v3Factory.getPool(token, weth, poolFee);
+    }
+
+    /// Buy `token` with ETH through its Uniswap V3 WETH pool. Pons v1 pools use poolFee = 10000.
+    /// `minTokensOut` is checked against what the buyer's balance actually gained (after any token tax).
+    function buyV3(address token, uint24 poolFee, uint256 minTokensOut, uint256 deadline)
+        external
+        payable
+        nonReentrant
+        checkDeadline(deadline)
+        returns (uint256 tokensOut)
+    {
+        if (msg.value == 0) revert ZeroAmount();
+        if (token == weth || v3Pool(token, poolFee) == address(0)) revert NoPool();
+
+        uint256 fee = (msg.value * feeBps) / BPS;
+        uint256 net = msg.value - fee;
+        feesAccrued[NATIVE] += fee;
+
+        IWETH9(weth).deposit{value: net}();
+        _approve(weth, address(swapRouter), net);
+        uint256 before = IERC20(token).balanceOf(msg.sender);
+        swapRouter.exactInputSingle(
+            ISwapRouter02.ExactInputSingleParams({
+                tokenIn: weth, tokenOut: token, fee: poolFee, recipient: msg.sender,
+                amountIn: net, amountOutMinimum: 0, sqrtPriceLimitX96: 0
+            })
+        );
+        _approve(weth, address(swapRouter), 0);
+        tokensOut = IERC20(token).balanceOf(msg.sender) - before;
+        if (tokensOut < minTokensOut) revert InsufficientOutput(tokensOut, minTokensOut);
+
+        emit Bought(msg.sender, token, ROUTE_V3, msg.value, fee, tokensOut);
+    }
+
+    /// Sell `tokensIn` of `token` (approved to this router) for ETH through its Uniswap V3 WETH pool.
+    /// `minEthOut` is the minimum ETH the seller receives after the frontend fee.
+    function sellV3(address token, uint24 poolFee, uint256 tokensIn, uint256 minEthOut, uint256 deadline)
+        external
+        nonReentrant
+        checkDeadline(deadline)
+        returns (uint256 ethOut)
+    {
+        if (tokensIn == 0) revert ZeroAmount();
+        if (token == weth || v3Pool(token, poolFee) == address(0)) revert NoPool();
+
+        uint256 tBefore = IERC20(token).balanceOf(address(this));
+        _pull(token, msg.sender, tokensIn);
+        uint256 got = IERC20(token).balanceOf(address(this)) - tBefore;   // handles transfer taxes
+
+        _approve(token, address(swapRouter), got);
+        uint256 wBefore = IERC20(weth).balanceOf(address(this));
+        swapRouter.exactInputSingle(
+            ISwapRouter02.ExactInputSingleParams({
+                tokenIn: token, tokenOut: weth, fee: poolFee, recipient: address(this),
+                amountIn: got, amountOutMinimum: 0, sqrtPriceLimitX96: 0
+            })
+        );
+        _approve(token, address(swapRouter), 0);
+        uint256 gross = IERC20(weth).balanceOf(address(this)) - wBefore;
+        IWETH9(weth).withdraw(gross);
+
+        uint256 fee = (gross * feeBps) / BPS;
+        ethOut = gross - fee;
+        if (ethOut < minEthOut) revert InsufficientOutput(ethOut, minEthOut);
+        feesAccrued[NATIVE] += fee;
+        _send(NATIVE, msg.sender, ethOut);
+
+        emit Sold(msg.sender, token, ROUTE_V3, tokensIn, fee, ethOut);
+    }
+
+    // =====================================================================
     //                          UNISWAP V4 SWAP
     // =====================================================================
 
@@ -308,14 +431,21 @@ contract PonsRouter is IUnlockCallback {
             ""
         );
 
+        // BalanceDelta packs two int128 values (amount0 in the high bits, amount1 in the low bits)
+        // forge-lint: disable-next-line(unsafe-typecast)
         int128 d0 = int128(delta >> 128);
+        // forge-lint: disable-next-line(unsafe-typecast)
         int128 d1 = int128(delta);
 
         (address inCur, address outCur, int128 dIn, int128 dOut) = s.zeroForOne
             ? (s.key.currency0, s.key.currency1, d0, d1)
             : (s.key.currency1, s.key.currency0, d1, d0);
+        // exact-input swap: we owe the input (negative) and receive the output (non-negative)
+        if (dIn >= 0 || dOut < 0) revert InsufficientOutput(0, 1);
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 owed = uint256(uint128(-dIn));
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 received = uint256(uint128(dOut));
 
         // pay the input to the PoolManager
