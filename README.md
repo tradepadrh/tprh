@@ -35,6 +35,11 @@ git push -u origin main
 | `DEXPAPRIKA_API_KEY` | recommended | `api_…` | Free key from console.dexpaprika.com. Unlocks 15m/6H/1D charts and 7 days of history, and raises rate limits. Stays on the server. |
 | `EXPLORER_URL` | no | `https://robinhoodchain.blockscout.com` | Override block explorer. |
 | `DEXPAPRIKA_API` | no | `https://api.dexpaprika.com` | Override API base. |
+| `PUBLIC_RPC_URL` | no | `https://rpc.mainnet.chain.robinhood.com` | Read-only RPC the browser uses for the Pons curve list. Public URLs only (it is visible to visitors). |
+
+The assets table has a three-way menu: **Pons curve** (Pons v2 launches still on the bonding curve, read
+on-chain from the Pons factory, with graduation progress), **Pons graduated** (Pons v2 graduates and Pons v1
+tokens trading on Uniswap) and **Uniswap** (every other pair).
 
    `PORT` is set by Railway automatically. Do **not** add private keys or RPC keys here; the frontend never needs them (users sign with their own wallet).
 4. Settings → Networking → **Generate Domain** (or add your own domain).

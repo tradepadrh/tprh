@@ -192,6 +192,34 @@ a { color: inherit; }
 .tabs-row { display: flex; align-items: center; gap: 6px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .tabs-row button { border: 1px solid transparent; background: none; padding: 7px 14px; border-radius: 99px; font-weight: 600; color: var(--muted); }
 .tabs-row button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); }
+/* source rail: where a token trades (Pons curve / Pons graduated / Uniswap) */
+.src-wrap { padding: 14px 14px 0; display: grid; gap: 12px; border-bottom: 1px solid var(--line); }
+.src-rail { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 5px; border-radius: 22px; background: rgba(0, 0, 0, .22); border: 1px solid var(--line); }
+.src-puck { position: absolute; top: 5px; bottom: 5px; left: 5px; width: calc((100% - 10px) / 3); border-radius: 17px; background: var(--volt);
+  box-shadow: 0 8px 26px rgba(204, 255, 4, .22), inset 0 1px 0 rgba(255, 255, 255, .55); transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .5s cubic-bezier(.7, 0, .2, 1); }
+.src-rail button { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 9px 12px; text-align: left; color: var(--fg); border-radius: 17px; min-width: 0; transition: color .3s; }
+.src-rail button svg { width: 32px; height: 32px; flex: none; padding: 7px; border-radius: 50%; background: var(--soft); transition: background .3s; }
+.src-rail b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src-rail small { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .3s; }
+.src-rail button[aria-selected="true"] { color: var(--volt-fg); }
+.src-rail button[aria-selected="true"] small { color: rgba(20, 26, 0, .68); }
+.src-rail button[aria-selected="true"] svg { background: rgba(20, 26, 0, .12); }
+.src-rail .live { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--volt); animation: livep 1.8s infinite; }
+.src-rail button[aria-selected="true"] .live { background: var(--volt-fg); }
+@keyframes livep { 0% { box-shadow: 0 0 0 0 rgba(204, 255, 4, .55); } 70%, 100% { box-shadow: 0 0 0 7px rgba(204, 255, 4, 0); } }
+.sorts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 4px 12px; }
+.sorts button { border: 1px solid var(--line); background: none; padding: 6px 12px; border-radius: 99px; font-weight: 600; font-size: 12px; color: var(--muted); }
+.sorts button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.sorts .note { margin-left: auto; font-size: 11px; color: var(--faint); }
+.gm { display: inline-flex; align-items: center; gap: 8px; }
+.gm .bar { width: 96px; height: 8px; border-radius: 8px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.gm .bar i { display: block; height: 100%; min-width: 3px; border-radius: 8px; background: linear-gradient(90deg, var(--warn), var(--volt)); }
+.gm.hot .bar { box-shadow: 0 0 12px rgba(204, 255, 4, .45); }
+.gm span { font-size: 12px; font-weight: 700; min-width: 42px; text-align: right; }
+.tag { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; padding: 2px 7px; border-radius: 99px; background: var(--volt-soft); color: var(--volt); text-transform: uppercase; }
+.tag.v1 { background: rgba(244, 201, 124, .14); color: var(--warn); }
+@media (max-width: 680px) { .src-rail button { flex-direction: column; gap: 4px; text-align: center; padding: 8px 4px; } .src-rail small { justify-content: center; } .src-rail button svg { width: 28px; height: 28px; padding: 6px; } }
+@media (prefers-reduced-motion: reduce) { .src-puck { transition: none; } .src-rail .live { animation: none; } }
 .tbl-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: inherit; }
 th { text-align: left; font-weight: 600; font-size: 11px; color: var(--muted); padding: 10px 18px; white-space: nowrap; }
@@ -282,6 +310,8 @@ th.r, td.r { text-align: right; }
   <symbol id="i-list" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
   <symbol id="i-coins" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M9 15v2c0 1.7 2.7 3 6 3s6-1.3 6-3v-5c0-1.7-2.7-3-6-3"/></g></symbol>
   <symbol id="i-pool" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 15c3-3 6-3 9 0s6 3 9 0M3 9c3-3 6-3 9 0s6 3 9 0"/></symbol>
+  <symbol id="i-curve" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20c7 0 10-4 12-9s3-7 6-7"/><circle cx="12.6" cy="14.6" r="1.6" fill="currentColor"/><path d="M3 20h18" opacity=".45"/></g></symbol>
+  <symbol id="i-grad" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/></g></symbol>
   <symbol id="i-layers" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></symbol>
@@ -411,15 +441,18 @@ th.r, td.r { text-align: right; }
         </section>
 
         <section class="card" id="c-table" aria-label="All assets">
-          <div class="tabs-row" role="tablist">
-            <button role="tab" data-t="volume" aria-selected="true">Most active</button>
-            <button role="tab" data-t="gainers" aria-selected="false">Gainers</button>
-            <button role="tab" data-t="losers" aria-selected="false">Losers</button>
-            <button role="tab" data-t="new" aria-selected="false">New pairs</button>
+          <div class="src-wrap">
+            <div class="src-rail" id="src" role="tablist" aria-label="Where the token trades">
+              <span class="src-puck" aria-hidden="true"></span>
+              <button role="tab" data-src="curve" aria-selected="false"><svg><use href="#i-curve"/></svg><span style="min-width:0"><b>Pons curve</b><small><i class="live"></i><span id="n-curve">scanning…</span></small></span></button>
+              <button role="tab" data-src="grad" aria-selected="false"><svg><use href="#i-grad"/></svg><span style="min-width:0"><b>Pons graduated</b><small id="n-grad">now on Uniswap</small></span></button>
+              <button role="tab" data-src="uni" aria-selected="false"><svg><use href="#i-pool"/></svg><span style="min-width:0"><b>Uniswap</b><small id="n-uni">all other pairs</small></span></button>
+            </div>
+            <div class="sorts" id="sorts" role="tablist" aria-label="Sort"></div>
           </div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r">24h volume</th><th class="r">24h change</th><th class="r">Action</th></tr></thead>
+              <thead><tr id="thead"><th style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r">24h volume</th><th class="r">24h change</th><th class="r">Action</th></tr></thead>
               <tbody id="assets"><tr><td colspan="6" class="muted">Loading market…</td></tr></tbody>
             </table>
           </div>
@@ -512,6 +545,9 @@ const CONFIG = {
   V3_FACTORY: "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",     // Uniswap V3 (Pons v1 pools live here)
   QUOTER_V2: "0x33e885eD0Ec9bF04EcfB19341582aADCb4c8A9E7",
   V3_FEES: [10000, 3000, 500, 100],                            // Pons v1 uses 10000 (1%), checked first
+  RPC: "https://rpc.mainnet.chain.robinhood.com",               // public read-only RPC (Pons launch list)
+  MULTICALL: "0xcA11bde05977b3631167028862bE2a173976CA11",
+  PONS_LAUNCH_ROWS: 160,   // newest Pons v2 launches read from chain for the curve list
   ROUTER: "",              // set after deploying, or via Settings
   DEFAULT_FEE_BPS: 50,
   TABLE_ROWS: 20,
@@ -567,7 +603,8 @@ const ABI = {
 // ======================= STATE =======================
 const S = {
   net: CONFIG.NETWORK_HINT, sample: false,
-  pools: [], allPools: null, newPools: null, newAt: 0, extra: [], venue: "", tableTab: "volume", trendTab: "volume",
+  pools: [], allPools: null, newPools: null, newAt: 0, extra: [], venue: "", trendTab: "volume",
+  src: ["curve", "grad", "uni"].includes(load("src")) ? load("src") : "curve", sort: { curve: "new", grad: "volume", uni: "volume" },
   sel: null, interval: "1h", side: "buy", slipBps: 100n,
   router: load("router") || CONFIG.ROUTER,
   wallet: null, pons: null, prices: {}, tokens: {},
@@ -713,6 +750,7 @@ async function loadPools(silent) {
     const all = (d.results || []).map(normalizePool);
     if (!all.length) throw new Error("empty");
     S.allPools = all; S.pools = dedupe(all); S.sample = false; setLive(true);
+    if (PONS.gradReady) checkV1(all.map(p => lc(splitPool(p).base.id))).then(() => { if (S.src !== "curve") renderTable(); }).catch(() => {});
   } catch (e) {
     if (silent && !S.sample) return;                         // keep showing the last good data
     S.allPools = S.pools = samplePools(); S.sample = true;
@@ -742,30 +780,271 @@ const venueOk = (p) => !S.venue || lc(p.dex_name + " " + p.dex_id).includes(S.ve
 function updateVolumeKpi() { const v = (S.allPools || S.pools).reduce((s, p) => s + (Number(p.volume_usd) || 0), 0); $("k-vol").textContent = fmtUsd(v); }
 
 // ======================= ASSETS TABLE =======================
+// Three sources, picked with the rail above the table:
+//   curve: Pons v2 launches still on the bonding curve (read straight from the Pons factory on-chain)
+//   grad:  Pons tokens that trade on Uniswap (v2 graduates + Pons v1 launches)
+//   uni:   every other pair on Uniswap (DexPaprika)
+const SORTS = {
+  curve: [["new", "Newest"], ["near", "Near graduation"], ["mcap", "Market cap"]],
+  grad: [["volume", "Most active"], ["gainers", "Gainers"], ["losers", "Losers"], ["new", "Recently graduated"]],
+  uni: [["volume", "Most active"], ["gainers", "Gainers"], ["losers", "Losers"], ["new", "New pairs"]],
+};
+const SRC_I = { curve: 0, grad: 1, uni: 2 };
+function renderSorts() {
+  const cur = S.sort[S.src];
+  const note = S.src === "curve" ? `<span class="note">newest ${CONFIG.PONS_LAUNCH_ROWS} launches · on-chain</span>` : S.src === "grad" ? `<span class="note">Pons v2 graduates + Pons v1</span>` : "";
+  $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note;
+  $("sorts").querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { S.sort[S.src] = b.dataset.sort; renderTable(); });
+  $("src").style.setProperty("--i", SRC_I[S.src]);
+  $("src").querySelectorAll("[data-src]").forEach(b => b.setAttribute("aria-selected", b.dataset.src === S.src));
+}
+$("src").querySelectorAll("[data-src]").forEach(b => b.onclick = () => {
+  if (S.src === b.dataset.src) return;
+  S.src = b.dataset.src; save("src", S.src); renderTable();
+  if (S.src !== "uni") loadPons().then(() => { if (S.src !== "uni") renderTable(); });
+});
+const isPonsToken = (id) => { id = lc(id); return !!(PONS.byId[id] || PONS.grad.has(id) || PONS.v1.has(id)); };
+const isPonsTraded = (id) => { id = lc(id); return PONS.grad.has(id) || PONS.v1.has(id); };
+function allLoadedPools() {
+  const seen = new Set(); const out = [];
+  for (const p of [...(S.allPools || S.pools), ...(S.newPools || []), ...S.extra]) { const id = lc(splitPool(p).base.id); if (!seen.has(id)) { seen.add(id); out.push(p); } }
+  return out;
+}
+const THEAD = {
+  std: (newCol) => `<th style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r">${newCol}</th><th class="r">24h change</th><th class="r">Action</th>`,
+  curve: `<th>Asset</th><th class="r">Price</th><th class="r">Market cap</th><th>Graduation</th><th class="r">Launched</th><th class="r">Action</th>`,
+};
+function updateCounts() {
+  const live = PONS.launches.filter(l => l.phase === 0).length;
+  if (PONS.ready) $("n-curve").textContent = live + " on curve now";
+  else if (PONS.error) $("n-curve").textContent = "chain unreachable";
+  const g = PONS.grad.size + PONS.v1.size;
+  if (PONS.gradReady) $("n-grad").textContent = g.toLocaleString("en-US") + " graduated";
+  const uni = S.pools.filter(p => !isPonsToken(splitPool(p).base.id)).length;
+  if (S.pools.length) $("n-uni").textContent = uni + " top pairs";
+}
 let tableSeq = 0;
 async function renderTable() {
   const seq = ++tableSeq; const body = $("assets");
-  let pools = S.tableTab === "new" ? await loadNewPools() : S.pools;
+  renderSorts(); updateCounts();
+  if (S.src === "curve") return renderCurveTable(seq);
+  const sort = S.sort[S.src];
+  $("thead").innerHTML = THEAD.std(sort === "new" ? (S.src === "grad" ? "Graduated" : "Listed") : "24h volume");
+  let pools;
+  if (S.src === "uni") {
+    pools = (sort === "new" ? await loadNewPools() : S.pools).filter(p => !isPonsToken(splitPool(p).base.id));
+  } else {
+    if (!PONS.gradReady && !PONS.error) body.innerHTML = `<tr><td colspan="6" class="empty">Reading Pons graduations from Robinhood Chain…</td></tr>`;
+    await loadPons().catch(() => {});
+    fetchGradPools();
+    pools = allLoadedPools().filter(p => isPonsTraded(splitPool(p).base.id));
+  }
   if (seq !== tableSeq) return;
   pools = pools.filter(venueOk);
   let rows = pools.map(p => ({ p, ...splitPool(p) }));
   rows.forEach(r => r.t = S.tokens[lc(r.base.id)]);
-  if (S.tableTab === "gainers") rows = rows.filter(r => r.t && r.t.change > 0).sort((a, b) => b.t.change - a.t.change);
-  if (S.tableTab === "losers") rows = rows.filter(r => r.t && r.t.change < 0).sort((a, b) => a.t.change - b.t.change);
+  if (sort === "gainers") rows = rows.filter(r => r.t && r.t.change > 0).sort((a, b) => b.t.change - a.t.change);
+  if (sort === "losers") rows = rows.filter(r => r.t && r.t.change < 0).sort((a, b) => a.t.change - b.t.change);
+  if (S.src === "grad" && sort === "volume") rows.sort((a, b) => (b.p.volume_usd || 0) - (a.p.volume_usd || 0));
+  if (S.src === "grad" && sort === "new") rows.sort((a, b) => (PONS.gradBlock[lc(b.base.id)] || 0) - (PONS.gradBlock[lc(a.base.id)] || 0));
   rows = rows.slice(0, CONFIG.TABLE_ROWS);
   if (!rows.length) {
-    const msg = S.tableTab === "gainers" ? "No tokens in this list are up right now." : S.tableTab === "losers" ? "No tokens in this list are down right now." : "No pools match this filter.";
+    const msg = S.src === "grad" && PONS.error ? "Could not reach Robinhood Chain to read Pons graduations. Try again in a moment."
+      : S.src === "grad" ? "Loading graduated Pons tokens…"
+      : sort === "gainers" ? "No tokens in this list are up right now." : sort === "losers" ? "No tokens in this list are down right now." : "No pools match this filter.";
     body.innerHTML = `<tr><td colspan="6" class="empty">${msg}</td></tr>`; return;
   }
-  body.innerHTML = rows.map(({ p, base, quote, t }) => `<tr>
+  body.innerHTML = rows.map(({ p, base, quote, t }) => {
+    const id = lc(base.id);
+    const tag = S.src === "grad" ? (PONS.grad.has(id) ? ' <span class="tag">v2</span>' : ' <span class="tag v1">v1</span>') : "";
+    const col4 = sort === "new" ? (S.src === "grad" ? (PONS.gradBlock[id] ? ago(blockTime(PONS.gradBlock[id])) : "—") : ago(p.created_at)) : fmtUsd(p.volume_usd);
+    return `<tr>
     <td>${starBtn(base.id)}</td>
-    <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b><span class="nm">${esc(base.name || "")}</span><span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
+    <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b>${tag}<span class="nm">${esc(base.name || "")}</span><span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
     <td class="r b">${t && t.price > 0 ? fmtPrice(t.price) : "—"}</td>
-    <td class="r">${S.tableTab === "new" ? ago(p.created_at) : fmtUsd(p.volume_usd)}</td>
+    <td class="r">${col4}</td>
     <td class="r">${t ? chipHTML(t.change) : '<span class="muted">—</span>'}</td>
-    <td class="r"><button class="btn btn-s" data-pool="${esc(p.id)}">Trade</button></td></tr>`).join("");
+    <td class="r"><button class="btn btn-s" data-pool="${esc(p.id)}">Trade</button></td></tr>`; }).join("");
   body.querySelectorAll("[data-pool]").forEach(b => b.onclick = () => { selectPool(pools.find(x => x.id === b.dataset.pool)); jump("c-chart"); });
   wireStars(body);
+}
+async function renderCurveTable(seq) {
+  const body = $("assets");
+  $("thead").innerHTML = THEAD.curve;
+  if (!PONS.ready) {
+    body.innerHTML = `<tr><td colspan="6" class="empty">Reading the newest Pons launches from Robinhood Chain…</td></tr>`;
+    try { await loadPons(); } catch {}
+    if (seq !== tableSeq) return;
+    if (!PONS.ready) { body.innerHTML = `<tr><td colspan="6" class="empty">Could not reach Robinhood Chain (${esc(CONFIG.RPC)}). <button class="link-btn" id="pons-retry" style="display:inline">Try again</button></td></tr>`; $("pons-retry").onclick = () => { PONS.error = null; renderTable(); }; return; }
+    renderSorts(); updateCounts();
+  }
+  const sort = S.sort.curve;
+  let rows = PONS.launches.filter(l => l.phase === 0 && l.symbol != null && isFinite(l.priceQ));
+  rows.forEach(priceLaunch);                                         // ETH price may have arrived since the last read
+  if (sort === "near") rows = rows.slice().sort((a, b) => (b.progress || 0) - (a.progress || 0));
+  if (sort === "mcap") rows = rows.slice().sort((a, b) => (b.mcap || 0) - (a.mcap || 0));
+  rows = rows.slice(0, CONFIG.TABLE_ROWS);
+  if (!rows.length) { body.innerHTML = `<tr><td colspan="6" class="empty">No Pons launches on the bonding curve right now.</td></tr>`; return; }
+  body.innerHTML = rows.map(L => {
+    const pct = Math.max(0, Math.min(1, L.progress || 0)) * 100;
+    const price = L.priceUsd > 0 ? fmtPrice(L.priceUsd) : L.priceQ > 0 ? fmtSmall(L.priceQ) + " " + esc(L.pairSym) : "—";
+    return `<tr>
+    <td><div class="asset">${avHTML(L.symbol, L.id)}<b>${esc(L.symbol)}</b><span class="nm">${esc(L.name || "")}</span>${L.pairSym !== "ETH" ? `<span class="muted pq" style="font-size:11px">/ ${esc(L.pairSym)}</span>` : ""}</div></td>
+    <td class="r b">${price}</td>
+    <td class="r">${L.mcap > 0 ? fmtUsd(L.mcap) : "—"}</td>
+    <td><span class="gm${pct >= 80 ? " hot" : ""}" title="${fmtNum(L.raised, 4)} of ${fmtNum(L.threshold, 4)} ${esc(L.pairSym)} raised"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct < 10 ? pct.toFixed(1) : pct.toFixed(0)}%</span></span></td>
+    <td class="r muted">${ago(blockTime(L.block))}</td>
+    <td class="r"><button class="btn btn-s" data-launch="${esc(L.id)}">Trade</button></td></tr>`; }).join("");
+  body.querySelectorAll("[data-launch]").forEach(b => b.onclick = () => { selectPool(curvePool(PONS.byId[b.dataset.launch])); jump("c-chart"); });
+}
+
+// ======================= PONS INDEX (on-chain) =======================
+const PONS_START = 89400000;                                          // first block with Pons v2 factory activity
+const T_LAUNCH = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607"; // topic1 = token
+const T_GRAD = "0xcdb72f157fd3666758a6ce201387ffb52038c7562e4fff352828da1096c4b6b4";   // topic1 = token (graduated)
+const PONS = { byId: {}, launches: [], lastBlock: 0, grad: new Set(), gradBlock: {}, gradTo: 0, v1: new Set(), v1Checked: new Set(),
+  ready: false, gradReady: false, error: null, loading: null, at: 0, head: null, gradFetched: new Set(), pairs: {} };
+let rpcP = null;
+const rpc = () => rpcP || (rpcP = new ethers.JsonRpcProvider(CONFIG.RPC, CONFIG.CHAIN_ID, { staticNetwork: true }));
+const IFC = () => (IFC.f ||= new ethers.Interface(ABI.factory));
+const ICV = () => (ICV.c ||= new ethers.Interface(ABI.curve));
+const IER = () => (IER.e ||= new ethers.Interface([...ABI.erc20, "function name() view returns (string)", "function totalSupply() view returns (uint256)"]));
+const IV1 = () => (IV1.v ||= new ethers.Interface(ABI.ponsV1Token));
+const IMC = () => (IMC.m ||= new ethers.Interface(["function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[])"]));
+// calls: [[target, iface, fn, args]] -> decoded value per call (null when it reverted)
+async function multicall(calls) {
+  const out = [];
+  for (let i = 0; i < calls.length; i += 150) {
+    const chunk = calls.slice(i, i + 150);
+    const data = IMC().encodeFunctionData("aggregate3", [chunk.map(([target, iface, fn, args]) => ({ target, allowFailure: true, callData: iface.encodeFunctionData(fn, args || []) }))]);
+    const [res] = IMC().decodeFunctionResult("aggregate3", await rpc().call({ to: CONFIG.MULTICALL, data }));
+    res.forEach((r, j) => {
+      const [, iface, fn] = chunk[j]; let v = null;
+      if (r.success && r.returnData !== "0x") { try { const d = iface.decodeFunctionResult(fn, r.returnData); v = d.length === 1 ? d[0] : d; } catch {} }
+      out.push(v);
+    });
+  }
+  return out;
+}
+async function factoryLogs(topic, from, to, step) {
+  const out = []; let a = from;
+  while (a <= to) {
+    const b = Math.min(to, a + step - 1);
+    try { out.push(...await rpc().getLogs({ address: CONFIG.PONS_FACTORY, topics: [topic], fromBlock: a, toBlock: b })); a = b + 1; }
+    catch (e) { if (step <= 50000) throw e; step = Math.floor(step / 2); }
+  }
+  return out;
+}
+// block -> time, from the measured block rate (blocks are far too many to fetch one by one)
+function blockTime(block) {
+  const h = PONS.head; if (!h) return NaN;
+  return new Date((h.ts - (h.block - block) * h.spb) * 1000).toISOString();
+}
+const topicAddr = (t) => "0x" + t.slice(26).toLowerCase();
+function quoteUsd(pair) {
+  if (pair === ZERO || pair === WETH) return S.prices[WETH] || NaN;
+  if (pair === USDG) return 1;
+  return S.prices[pair] || NaN;
+}
+function loadPons(force) {
+  if (PONS.loading) return PONS.loading;
+  if (!force && PONS.ready && Date.now() - PONS.at < 25000) return Promise.resolve();
+  return PONS.loading = (async () => {
+    try {
+      const p = rpc();
+      const latest = await p.getBlockNumber();
+      if (!PONS.head || latest - PONS.head.block > 2_000_000) {
+        const [b1, b0] = await Promise.all([p.getBlock(latest), p.getBlock(latest - 500000)]);
+        PONS.head = { block: latest, ts: b1.timestamp, spb: (b1.timestamp - b0.timestamp) / 500000 };
+      } else PONS.head = { ...PONS.head, block: latest, ts: PONS.head.ts + (latest - PONS.head.block) * PONS.head.spb };
+      // newest launches (incremental after the first read)
+      const from = PONS.lastBlock ? PONS.lastBlock + 1 : Math.max(PONS_START, latest - 1_500_000);
+      if (from <= latest) {
+        for (const l of await factoryLogs(T_LAUNCH, from, latest, 1_500_000)) {
+          const id = topicAddr(l.topics[1]);
+          if (!PONS.byId[id]) { PONS.byId[id] = { id, block: l.blockNumber, phase: null, symbol: null }; PONS.launches.push(PONS.byId[id]); }
+        }
+        PONS.launches.sort((a, b) => b.block - a.block); PONS.lastBlock = latest;
+      }
+      await readLaunchState(PONS.launches.slice(0, CONFIG.PONS_LAUNCH_ROWS));
+      PONS.ready = true; PONS.error = null; PONS.at = Date.now();
+      // graduations: whole history once (cached in this browser), then incremental
+      if (!PONS.gradTo) {
+        try { const c = JSON.parse(load("ponsgrad") || "null"); if (c && c.to > PONS_START) { PONS.gradTo = c.to; for (const [id, b] of c.g) { PONS.grad.add(id); PONS.gradBlock[id] = b; } } } catch {}
+      }
+      const gFrom = PONS.gradTo ? PONS.gradTo + 1 : PONS_START;
+      if (gFrom <= latest) {
+        for (const l of await factoryLogs(T_GRAD, gFrom, latest, 4_000_000)) { const id = topicAddr(l.topics[1]); PONS.grad.add(id); PONS.gradBlock[id] = l.blockNumber; }
+        PONS.gradTo = latest;
+        save("ponsgrad", JSON.stringify({ to: latest, g: Object.entries(PONS.gradBlock) }));
+      }
+      PONS.gradReady = true;
+      await checkV1(allLoadedPools().map(p => lc(splitPool(p).base.id)));
+    } catch (e) { PONS.error = e; if (!PONS.ready) throw e; }
+    finally { PONS.loading = null; updateCounts(); }
+  })();
+}
+async function readLaunchState(list) {
+  const calls = [];
+  for (const L of list) {
+    calls.push([CONFIG.PONS_FACTORY, IFC(), "getLaunchedToken", [L.id]]);
+    if (L.symbol == null) calls.push([L.id, IER(), "symbol"], [L.id, IER(), "name"], [L.id, IER(), "totalSupply"], [L.id, IER(), "decimals"]);
+  }
+  const r = await multicall(calls); let k = 0;
+  for (const L of list) {
+    const g = r[k++];
+    if (L.symbol == null) { L.symbol = String(r[k++] ?? "?"); L.name = String(r[k++] ?? ""); L.supplyRaw = r[k++]; L.dec = Number(r[k++] ?? 18); }
+    if (g && g.exists) { L.phase = Number(g.phase); L.curve = g.curve; L.pair = lc(g.pairToken); if (L.phase === 2) { PONS.grad.add(L.id); PONS.gradBlock[L.id] ||= L.block; } }
+    else L.phase = -1;
+  }
+  // pair token details (ETH and USDG known; anything else read once)
+  const unknown = [...new Set(list.filter(L => L.phase === 0 && L.pair && L.pair !== ZERO && L.pair !== WETH && L.pair !== USDG && !PONS.pairs[L.pair]).map(L => L.pair))];
+  if (unknown.length) {
+    const pr = await multicall(unknown.flatMap(a => [[a, IER(), "symbol"], [a, IER(), "decimals"]]));
+    unknown.forEach((a, i) => PONS.pairs[a] = { sym: String(pr[i * 2] ?? "?"), dec: Number(pr[i * 2 + 1] ?? 18) });
+    unknown.forEach(a => { if (!S.tokens[a]) getToken(a); });              // its USD price, when DexPaprika has one
+  }
+  const live = list.filter(L => L.phase === 0 && L.curve);
+  const cr = await multicall(live.flatMap(L => [[L.curve, ICV(), "getReserves"], [L.curve, ICV(), "realQuoteReserve"], [L.curve, ICV(), "graduationThreshold"]]));
+  live.forEach((L, i) => {
+    const res = cr[i * 3], real = cr[i * 3 + 1], thr = cr[i * 3 + 2];
+    const pi = L.pair === ZERO || L.pair === WETH ? { sym: "ETH", dec: 18 } : L.pair === USDG ? { sym: "USDG", dec: 6 } : PONS.pairs[L.pair] || { sym: "?", dec: 18 };
+    L.pairSym = pi.sym; L.qDec = pi.dec;
+    const q = res ? Number(ethers.formatUnits(res[0], pi.dec)) : NaN, t = res ? Number(ethers.formatUnits(res[1], L.dec)) : NaN;
+    L.priceQ = q > 0 && t > 0 ? q / t : NaN;
+    L.raised = real != null ? Number(ethers.formatUnits(real, pi.dec)) : NaN;
+    L.threshold = thr != null ? Number(ethers.formatUnits(thr, pi.dec)) : NaN;
+    L.progress = L.threshold > 0 ? L.raised / L.threshold : 0;
+    L.supply = L.supplyRaw != null ? Number(ethers.formatUnits(L.supplyRaw, L.dec)) : NaN;
+    priceLaunch(L);
+  });
+}
+function priceLaunch(L) { const usd = quoteUsd(L.pair); L.priceUsd = L.priceQ * usd; L.mcap = L.priceUsd * L.supply; L.raisedUsd = L.raised * usd; }
+// Pons v1 tokens expose liquidityPool() (their Uniswap V3 pool)
+async function checkV1(ids) {
+  ids = [...new Set(ids)].filter(id => id && !QUOTES.has(id) && !PONS.v1Checked.has(id) && !PONS.byId[id] && !PONS.grad.has(id));
+  if (!ids.length) return;
+  const r = await multicall(ids.map(id => [id, IV1(), "liquidityPool"]));
+  ids.forEach((id, i) => { PONS.v1Checked.add(id); if (r[i] && r[i] !== ZERO) PONS.v1.add(id); });
+}
+// DexPaprika rows for the most recent graduates that are not in today's top lists
+let gradFetching = false;
+function fetchGradPools() {
+  if (gradFetching || S.sample || !PONS.gradReady) return;
+  const want = [...PONS.grad].filter(id => !PONS.gradFetched.has(id) && !poolForToken(id))
+    .sort((a, b) => (PONS.gradBlock[b] || 0) - (PONS.gradBlock[a] || 0)).slice(0, 16);
+  if (!want.length) return;
+  gradFetching = true; want.forEach(id => PONS.gradFetched.add(id));
+  Promise.allSettled(want.map(getToken)).then(() => { gradFetching = false; if (S.src === "grad") renderTable(); });
+}
+// a curve launch shown as a pool row (no DexPaprika pool exists until it graduates)
+function curvePool(L) {
+  const quote = L.pair === ZERO || !L.pair ? { id: ZERO, symbol: "ETH", name: "Ether", decimals: 18 } : { id: L.pair, symbol: L.pairSym, name: "", decimals: L.qDec };
+  S.tokens[L.id] = { price: L.priceUsd, change: NaN, vol: NaN, txns: NaN, liq: L.raisedUsd, fdv: L.mcap, curve: true };
+  if (L.priceUsd > 0) S.prices[L.id] = L.priceUsd;
+  return { id: "curve:" + L.id, dex_id: "pons_curve", dex_name: "Pons curve", curve: L, created_at: blockTime(L.block),
+    volume_usd: NaN, transactions: NaN, liquidity_usd: L.raisedUsd, price_usd: L.priceUsd,
+    tokens: [{ id: L.id, symbol: L.symbol, name: L.name, decimals: L.dec }, quote] };
 }
 function starBtn(id) { const on = S.stars.has(lc(id)); return `<button class="star" data-star="${esc(lc(id))}" aria-pressed="${on}" title="${on ? "Remove from" : "Add to"} watchlist"><svg><use href="#i-star"/></svg></button>`; }
 function wireStars(root) {
@@ -907,6 +1186,12 @@ async function loadChart() {
   const note = $("chart-note"); note.hidden = false; note.textContent = "Loading chart…";
   if (!ensureChart()) return;
   const { pool, base } = S.sel; const cfg = intervalCfg(S.interval);
+  if (pool.curve) {
+    lastBars = null; candle.setData([]); vol.setData([]);
+    const L = pool.curve, pct = Math.min(100, (L.progress || 0) * 100);
+    note.textContent = `On the Pons bonding curve · ${pct.toFixed(1)}% to graduation (${fmtNum(L.raised, 4)} / ${fmtNum(L.threshold, 4)} ${L.pairSym}). Candles start once it graduates to Uniswap.`;
+    return;
+  }
   let rows = [], err = null;
   if (S.sample) rows = sampleCandles(pool.id, cfg.limit, S.interval);
   else {
@@ -933,7 +1218,7 @@ async function loadChart() {
 function renderActivity() {
   const body = $("txs"); const sel = S.sel; if (!sel) return;
   const t = S.tokens[lc(sel.base.id)];
-  if (!t || !t.tf) { body.innerHTML = `<tr><td colspan="3" class="muted">${t ? "No activity data for this token yet." : "Loading…"}</td></tr>`; return; }
+  if (!t || !t.tf) { body.innerHTML = `<tr><td colspan="3" class="muted">${t?.curve ? "Bonding-curve token: buy/sell stats start after it graduates to Uniswap." : t ? "No activity data for this token yet." : "Loading…"}</td></tr>`; return; }
   const rows = [["5m", "5 min"], ["1h", "1 hour"], ["6h", "6 hours"], ["24h", "24 hours"]].map(([k, label]) => {
     const w = t.tf[k] || {}; const b = Number(w.buys) || 0, s = Number(w.sells) || 0, n = b + s;
     const pb = n ? Math.round(b / n * 100) : 0;
@@ -966,7 +1251,14 @@ $("q").addEventListener("input", (e) => {
     }
     if ($("q").value.trim() !== q) return;
     const seen = new Set(); pools = pools.filter(p => !seen.has(p.id) && seen.add(p.id)).sort((a, b) => (b.volume_usd || 0) - (a.volume_usd || 0)).slice(0, 10);
-    box.innerHTML = pools.length ? "" : '<div class="empty">Not found on Robinhood Chain.</div>';
+    const curveHits = PONS.launches.filter(L => L.phase === 0 && L.symbol && isFinite(L.priceQ) && (L.id === lc(q) || lc(L.symbol + " " + L.name).includes(lc(q)))).slice(0, 5);
+    box.innerHTML = pools.length || curveHits.length ? "" : '<div class="empty">Not found on Robinhood Chain.</div>';
+    for (const L of curveHits) {
+      const b = document.createElement("button");
+      b.innerHTML = `${avHTML(L.symbol, L.id)}<div style="min-width:0;flex:1"><b>${esc(L.symbol)}</b> <span class="tag">Pons curve</span><div class="muted" style="font-size:11px">${short(L.id)}</div></div><span class="muted">${((L.progress || 0) * 100).toFixed(1)}%</span>`;
+      b.onclick = () => { box.hidden = true; $("q").value = ""; selectPool(curvePool(L)); };
+      box.appendChild(b);
+    }
     for (const p of pools) {
       const { base, quote } = splitPool(p); const b = document.createElement("button");
       b.innerHTML = `${avHTML(base.symbol, base.id)}<div style="min-width:0;flex:1"><b>${esc(base.symbol)}</b> <span class="muted">/ ${esc(quote.symbol)}</span><div class="muted" style="font-size:11px">${short(base.id)}</div></div><span class="muted">${fmtUsd(p.volume_usd)}</span>`;
@@ -982,7 +1274,6 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".search")) $(
 $("venues").querySelectorAll("button").forEach(b => b.onclick = () => {
   $("venues").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); S.venue = b.dataset.v; renderTable(); renderTrend();
 });
-document.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { document.querySelectorAll("[data-t]").forEach(x => x.setAttribute("aria-selected", x === b)); S.tableTab = b.dataset.t; renderTable(); });
 
 // ======================= WALLET =======================
 async function connect() {
@@ -1437,8 +1728,11 @@ if (window.gsap && !REDUCED) {
 renderRevenue(null);
 setupIntervals();
 loadPools().then(loadMissingStars);
+// Pons index runs in the background: it sorts tokens into curve / graduated / Uniswap
+loadPons().then(() => renderTable()).catch(() => { updateCounts(); if (S.src !== "uni") renderTable(); });
+setInterval(() => { if (!document.hidden && S.src === "curve") loadPons(true).then(() => { if (S.src === "curve") renderTable(); }).catch(() => {}); }, 30000);
 // refresh market data every minute while the tab is visible (the server caches DexPaprika for ~60s)
-setInterval(() => { if (!document.hidden && !S.sample) { S.newAt = 0; loadPools(true); if (S.tableTab === "new") renderTable(); } }, 60000);
+setInterval(() => { if (!document.hidden && !S.sample) { S.newAt = 0; loadPools(true); } }, 60000);
 })();
 </script>
 

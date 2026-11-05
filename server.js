@@ -30,6 +30,8 @@ function buildConfig() {
   const fee = Number(process.env.DEFAULT_FEE_BPS);
   if (Number.isInteger(fee) && fee >= 0 && fee <= 100) cfg.DEFAULT_FEE_BPS = fee;
   if (process.env.EXPLORER_URL) cfg.EXPLORER = process.env.EXPLORER_URL.replace(/\/+$/, "");
+  // public read-only RPC used by the browser for the Pons launch list (never put a private RPC key here)
+  if (/^https:\/\//.test(process.env.PUBLIC_RPC_URL || "")) cfg.RPC = process.env.PUBLIC_RPC_URL.trim();
   return "window.TRADEPAD_CONFIG = " + JSON.stringify(cfg) + ";\n";
 }
 const CONFIG_JS = buildConfig();
