@@ -64,6 +64,15 @@ FEE_BPS="${FEE_BPS:-50}"
 [[ "$FEE_BPS" =~ ^[0-9]+$ ]] && [ "$FEE_BPS" -le 100 ] || fail "fee must be a number from 0 to 100."
 export FEE_RECIPIENT FEE_BPS
 echo "RPC:           $RPC_URL"
+# check the RPC before asking for the key, so a network problem shows up first
+if ! CHAIN="$(curl -s -m 15 -X POST -H 'Content-Type: application/json' \
+      --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' "$RPC_URL")" \
+   || [[ "$CHAIN" != *'"0x1237"'* ]]; then
+  fail "cannot reach the Robinhood Chain RPC ($RPC_URL) from this computer.
+Your network or provider is blocking it. Turn on a VPN (for example Cloudflare WARP / 1.1.1.1)
+and run the same command again, or use another RPC: RPC_URL=https://... bash tradepad/deploy.sh"
+fi
+echo "RPC reachable (chain 4663)."
 echo "Fee recipient: $FEE_RECIPIENT"
 echo "Fee:           $FEE_BPS bps ($(awk "BEGIN{printf \"%.2f\", $FEE_BPS/100}")%)"
 
@@ -72,7 +81,9 @@ step "5/5 Deploying"
 echo "The deployer wallet needs a little ETH on Robinhood Chain for gas and becomes the router owner."
 if [ -z "${PRIVATE_KEY:-}" ]; then
   # read by bash itself: Windows terminals (Git Bash / UCRT64) often can't show forge's own hidden prompt
-  read -rsp "Paste the deployer PRIVATE KEY (hidden, not saved), then Enter: " PRIVATE_KEY; echo
+  echo "Paste ONCE (right-click > Paste or Shift+Insert), then press Enter. Nothing is shown while you paste."
+  read -rsp "Deployer PRIVATE KEY (hidden, not saved): " PRIVATE_KEY; echo
+  echo "Key received."
 fi
 PRIVATE_KEY="$(printf '%s' "$PRIVATE_KEY" | tr -d '[:space:]')"
 [[ "$PRIVATE_KEY" =~ ^(0x)?[0-9a-fA-F]{64}$ ]] || { unset PRIVATE_KEY; fail "that is not a private key (64 hex characters)."; }
@@ -85,6 +96,8 @@ forge script script/Deploy.s.sol --rpc-url "$RPC_URL" --broadcast --private-key 
 STATUS=${PIPESTATUS[0]}
 set -e
 unset PRIVATE_KEY
+# throw away anything pasted again while deploying, so it never lands on the shell prompt
+while read -r -t 0.1 -n 10000 _junk 2>/dev/null; do :; done; unset _junk
 [ "$STATUS" -eq 0 ] || { rm -f "$OUT"; fail "deploy did not complete. Read the message above."; }
 ROUTER="$(grep -o 'PonsRouter deployed at 0x[0-9a-fA-F]\{40\}' "$OUT" | awk '{print $4}' | tail -1)"
 rm -f "$OUT"
