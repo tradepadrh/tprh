@@ -100,9 +100,9 @@ th.act { background: rgba(34, 30, 25, .0); }
 /* ---- trade window */
 .tm { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 18px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
 .tm[hidden] { display: none; }
-.tm-card { width: min(440px, 100%); max-height: calc(100dvh - 36px); overflow: auto; border-radius: 30px; padding: 16px; background: rgba(32, 28, 23, .95); display: grid; gap: 12px; overscroll-behavior: contain; }
+.tm-card { width: min(1180px, 100%); max-height: calc(100dvh - 36px); overflow: auto; border-radius: 30px; padding: 16px; background: rgba(32, 28, 23, .95); display: grid; gap: 12px; overscroll-behavior: contain; }
 .tm-top { display: flex; gap: 10px; align-items: flex-start; }
-.tm-head { flex: 1; min-width: 0; display: grid; gap: 12px; }
+.tm-head { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 30px; }
 .tm-tok { display: flex; gap: 12px; align-items: center; min-width: 0; } .tm-tok .av { width: 44px; height: 44px; font-size: 13px; }
 .tm-sym { font-size: 19px; font-weight: 700; } .tm-sym .muted { font-size: 13px; font-weight: 500; }
 .tm-sub { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); min-width: 0; } .tm-sub .ellip { max-width: 160px; }
@@ -111,9 +111,16 @@ th.act { background: rgba(34, 30, 25, .0); }
 .tm-quick { display: flex; gap: 8px; align-items: center; } .tm-quick .qb-set { margin: 0; height: 44px; }
 .tm-status { font-size: 13px; padding: 10px 14px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
 .tm-status svg { color: var(--volt); } .tm-status.busy { border-color: rgba(204, 255, 4, .35); } .tm-status.err { border-color: rgba(255, 140, 120, .5); color: #ffb4a6; } .tm-status.ok { border-color: var(--volt); color: var(--volt); }
+.tm-grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
+.tm-right { display: grid; gap: 12px; min-width: 0; }
+.tm-left #c-chart { box-shadow: none; backdrop-filter: none; background: rgba(0, 0, 0, .18); }
+.tm-left #c-chart .ch-head { display: none; }
+.tm-left #chart { height: 440px; }
+@media (max-width: 960px) { .tm-grid { grid-template-columns: minmax(0, 1fr); } .tm-left #chart { height: 300px; } .tm-card { width: min(560px, 100%); } }
+@media (max-width: 560px) { .tm-left #chart { height: 230px; margin: 4px; } .tm-left .ch-bar { padding: 10px 10px 0; } .tm-left .venue-tag { display: none; } .tm-head { gap: 10px 20px; } }
 .tm-body #c-swap { box-shadow: none; background: transparent; border: 0; backdrop-filter: none; }
 .tm-body #c-swap .swap-in { padding: 0; }
-@media (max-width: 560px) { .tm { place-items: end stretch; padding: 0; } .tm-card { width: 100%; border-radius: 26px 26px 0 0; max-height: 92dvh; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); } .tm-quick .qb-set#tm-chart { display: none; } }
+@media (max-width: 560px) { .tm { place-items: end stretch; padding: 0; } .tm-card { width: 100%; border-radius: 26px 26px 0 0; max-height: 92dvh; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); } }
 body.noscroll { overflow: hidden; }
 /* ---- quick buy popover */
 .qbpop { position: fixed; z-index: 70; padding: 14px; border-radius: 20px; background: rgba(32, 28, 23, .97); box-shadow: var(--shadow); display: grid; gap: 10px; }
@@ -664,9 +671,14 @@ th.r, td.r { text-align: right; }
 <div class="tm" id="tm" hidden role="dialog" aria-modal="true" aria-label="Trade">
   <div class="tm-card glass">
     <div class="tm-top"><div class="tm-head" id="tm-head"></div><button class="icon-btn" id="tm-x" aria-label="Close">✕</button></div>
-    <div class="tm-quick"><button class="qb big" id="tm-qb"></button><button class="qb-set" id="tm-qbset" title="Change the quick buy amount">Edit amount</button><button class="qb-set" id="tm-chart">Chart</button></div>
-    <div class="tm-status" id="tm-status" hidden></div>
-    <div class="tm-body" id="tm-body"></div>
+    <div class="tm-grid">
+      <div class="tm-left" id="tm-chartslot"></div>
+      <div class="tm-right">
+        <div class="tm-quick"><button class="qb big" id="tm-qb"></button><button class="qb-set" id="tm-qbset" title="Change the quick buy amount">Edit amount</button></div>
+        <div class="tm-status" id="tm-status" hidden></div>
+        <div class="tm-body" id="tm-body"></div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="qbpop glass" id="qbpop" hidden role="dialog" aria-label="Quick buy amount">
@@ -2249,13 +2261,17 @@ document.addEventListener("click", (e) => { if (!$("qbpop").hidden && !e.target.
 
 // ======================= TRADE WINDOW =======================
 // The swap card itself moves into the window, so every route, quote and safety check stays the same.
-let swapHome = null;
+let swapHome = null, chartHome = null;
 function openTrade(pool, opts = {}) {
   if (!pool) return;
   const ready = S.sel?.pool.id !== pool.id ? selectPool(pool) : Promise.resolve();
   const card = $("c-swap");
   if (!swapHome) { swapHome = document.createComment("swap-home"); card.parentNode.insertBefore(swapHome, card); }
   $("tm-body").appendChild(card);
+  // the chart comes along, so the candles are visible right next to the buy button
+  const ch = $("c-chart");
+  if (!chartHome) { chartHome = document.createComment("chart-home"); ch.parentNode.insertBefore(chartHome, ch); }
+  $("tm-chartslot").appendChild(ch);
   $("tm").hidden = false; document.body.classList.add("noscroll");
   renderTmHead(); renderTmQb(); $("tm-status").hidden = true;
   if (!opts.quick) setTimeout(() => $("amt").focus({ preventScroll: true }), 60);
@@ -2267,6 +2283,7 @@ function closeTrade() {
   if ($("tm").hidden) return;
   $("tm").hidden = true; document.body.classList.remove("noscroll"); qbRun = null;
   if (swapHome) swapHome.parentNode.insertBefore($("c-swap"), swapHome.nextSibling);
+  if (chartHome) chartHome.parentNode.insertBefore($("c-chart"), chartHome.nextSibling);
 }
 function renderTmHead() {
   const sel = S.sel; if (!sel) return; const { base, pool } = sel, t = S.tokens[lc(base.id)] || {};
@@ -2282,7 +2299,7 @@ $("tm").addEventListener("click", (e) => { if (e.target === $("tm")) closeTrade(
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("tm").hidden && $("wm").hidden) closeTrade(); });
 $("tm-qb").onclick = () => quickBuy(S.sel?.pool);
 $("tm-qbset").onclick = (e) => { e.stopPropagation(); openQbPop($("tm-qbset")); };
-$("tm-chart").onclick = () => { closeTrade(); $("c-chart").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); };
+
 
 // ======================= ONE-CLICK BUY =======================
 // Fills the trade window with the saved amount and presses Buy as soon as the route and quote are ready.
