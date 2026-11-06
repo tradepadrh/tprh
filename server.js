@@ -10,6 +10,8 @@ const http = require("node:http");
 const https = require("node:https");
 const fs = require("node:fs");
 const path = require("node:path");
+const dns = require("node:dns");
+const net = require("node:net");
 
 const PORT = Number(process.env.PORT) || 3000; // Railway injects PORT
 const ROOT = path.join(__dirname, "web");
@@ -21,7 +23,7 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // ---------------------------------------------------------------- config.js
 function buildConfig() {
-  const cfg = { API: "/dp", HAS_KEY: Boolean(API_KEY), RPC_PROXY: "/rpc", IMG_PROXY: "/img/ipfs/" };
+  const cfg = { API: "/dp", HAS_KEY: Boolean(API_KEY), RPC_PROXY: "/rpc", IMG_PROXY: "/img/ipfs/", VERIFY: "/verify" };
   const router = (process.env.ROUTER_ADDRESS || "").trim();
   if (router) {
     if (ADDRESS_RE.test(router)) cfg.ROUTER = router;
@@ -232,9 +234,72 @@ async function ipfsImage(req, res, cid) {
   send(res, 200, hit.body, { "Content-Type": hit.type, "Cache-Control": "public, max-age=31536000, immutable", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
 }
 
+// ---------------------------------------------------------------- CA check on a token's own website / Telegram
+// "Does the project's website or public Telegram channel show this exact contract address?"
+// Fetches are SSRF-safe: public http(s) hosts only, no private or local addresses, size and time capped.
+function privateIp(ip) {
+  if (net.isIPv4(ip)) { const [a, b] = ip.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224; }
+  const x = ip.toLowerCase(); return x === "::1" || x === "::" || x.startsWith("fc") || x.startsWith("fd") || x.startsWith("fe80") || x.startsWith("::ffff:") && privateIp(x.slice(7));
+}
+function safeLookup(host, opts, cb) {
+  dns.lookup(host, { family: 0 }, (err, address, family) => {
+    if (err) return cb(err);
+    if (privateIp(address)) return cb(new Error("blocked address"));
+    if (opts && opts.all) return cb(null, [{ address, family }]);
+    cb(null, address, family);
+  });
+}
+function fetchText(url, hops = 0) {
+  return new Promise((resolve) => {
+    let u; try { u = new URL(url); } catch { return resolve(null); }
+    if (!/^https?:$/.test(u.protocol) || (u.port && !["80", "443"].includes(u.port)) || net.isIP(u.hostname) && privateIp(u.hostname)) return resolve(null);
+    const lib = u.protocol === "http:" ? http : https;
+    const req = lib.get(u, { lookup: safeLookup, timeout: 8000, headers: { "User-Agent": "Mozilla/5.0 (compatible; TradePadVerify/1.0)", Accept: "text/html,*/*" } }, (up) => {
+      if (up.statusCode >= 300 && up.statusCode < 400 && up.headers.location && hops < 3) { up.resume(); return resolve(fetchText(new URL(up.headers.location, u).href, hops + 1)); }
+      if (up.statusCode !== 200) { up.resume(); return resolve(null); }
+      const chunks = []; let size = 0;
+      up.on("data", (c) => { size += c.length; if (size > 1.5e6) up.destroy(); else chunks.push(c); });
+      up.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      up.on("close", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      up.on("error", () => resolve(null));
+    });
+    req.on("timeout", () => req.destroy()); req.on("error", () => resolve(null));
+  });
+}
+const verifyCache = new Map();
+async function checkSite(ca, url, kind) {
+  if (!url) return null;
+  let target = url;
+  if (kind === "tg") { const m = String(url).match(/^https?:\/\/(?:t\.me|telegram\.me)\/(?:s\/)?([A-Za-z0-9_]{4,32})\/?$/i); if (!m) return null; target = `https://t.me/s/${m[1]}`; }
+  const key = ca + "|" + target, hit = verifyCache.get(key);
+  if (hit && hit.exp > Date.now()) return hit.v;
+  const text = await fetchText(target);
+  const v = text == null ? null : text.toLowerCase().includes(ca.toLowerCase());
+  verifyCache.set(key, { v, exp: Date.now() + (v == null ? 600e3 : 3600e3) });
+  if (verifyCache.size > 3000) verifyCache.delete(verifyCache.keys().next().value);
+  return v;
+}
+function verifyRoute(req, res) {
+  const chunks = []; let size = 0;
+  req.on("data", (c) => { size += c.length; if (size > 64 * 1024) req.destroy(); else chunks.push(c); });
+  req.on("end", async () => {
+    let list; try { list = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return json(res, 400, { error: "bad json" }); }
+    if (!Array.isArray(list) || list.length > 30) return json(res, 400, { error: "send up to 30 items" });
+    const items = list.filter(x => x && ADDRESS_RE.test(x.ca || "")).map(x => ({ ca: x.ca.toLowerCase(), web: typeof x.web === "string" ? x.web.slice(0, 200) : null, tg: typeof x.tg === "string" ? x.tg.slice(0, 200) : null }));
+    const out = []; let i = 0;
+    const worker = async () => { while (i < items.length) { const it = items[i++];
+      const [web, tg] = await Promise.all([checkSite(it.ca, it.web, "web"), checkSite(it.ca, it.tg, "tg")]);
+      out.push({ ca: it.ca, web, tg }); } };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    json(res, 200, out);
+  });
+}
+
 // ---------------------------------------------------------------- server
 const server = http.createServer((req, res) => {
   if (req.method === "POST" && req.url === "/rpc") return rpcRelay(req, res);
+  if (req.method === "POST" && req.url === "/verify") return verifyRoute(req, res);
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method Not Allowed", { Allow: "GET, HEAD, POST" });
 
   let url;

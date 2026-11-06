@@ -97,6 +97,25 @@ th.act { background: rgba(34, 30, 25, .0); }
 }
 @container tbl (max-width: 480px) { .asset .l2 { display: none; } .asset .av { width: 28px; height: 28px; } td.b { font-size: 13px; } th.act, td.act { padding-left: 14px; } }
 @container tbl (max-width: 400px) { .c-grad { display: none; } }
+/* ---- safety badges, filters, panel */
+.sb { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font-size: 11px; font-weight: 900; flex: none; }
+.sb.ok { color: var(--volt); } .sb.ok svg { width: 15px; height: 15px; }
+.sb.risk { background: #F4C97C; color: #2a1d05; }
+.sf { display: inline-flex; gap: 6px; }
+.sf button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--line); background: none; color: var(--muted); font-weight: 600; font-size: 12px; }
+.sf button[aria-pressed="true"] { background: rgba(204, 255, 4, .12); border-color: rgba(204, 255, 4, .5); color: var(--volt); }
+details.safe { width: 100%; border: 1px solid var(--line); border-radius: 16px; background: var(--soft); }
+details.safe summary { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; font-size: 13px; list-style: none; }
+details.safe summary::-webkit-details-marker { display: none; }
+details.safe summary svg { width: 15px; height: 15px; color: var(--volt); }
+details.safe summary b.ok { color: var(--volt); } details.safe summary b.bad { color: #F4C97C; }
+details.safe summary span { margin-left: auto; color: var(--muted); font-size: 12px; }
+details.safe ul { list-style: none; margin: 0; padding: 0 14px 6px; display: grid; gap: 6px; }
+details.safe li { display: flex; gap: 9px; font-size: 12.5px; color: var(--fg); align-items: baseline; }
+details.safe li i { font-style: normal; width: 16px; text-align: center; font-weight: 900; }
+details.safe li.ok i { color: var(--volt); } details.safe li.warn i, details.safe li.bad i { color: #F4C97C; } details.safe li.bad { color: #F4C97C; } details.safe li.na { color: var(--muted); }
+details.safe p { margin: 4px 14px 12px; font-size: 11px; color: var(--faint); }
+@container tbl (max-width: 620px) { .sf button { padding: 0 9px; } }
 /* ---- trade window */
 .tm { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 18px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
 .tm[hidden] { display: none; }
@@ -805,6 +824,7 @@ const S = {
   net: CONFIG.NETWORK_HINT, sample: false,
   pools: [], allPools: null, newPools: null, newAt: 0, extra: [], venue: "", trendTab: "volume",
   qb: /^\d*\.?\d+$/.test(load("qb")) ? load("qb") : "0.01",
+  safeOnly: ["safe", "verified"].includes(load("safe")) ? load("safe") : "",
   src: ["curve", "grad", "uni"].includes(load("src")) ? load("src") : "curve", sort: { curve: "new", grad: "volume", uni: "volume" },
   sel: null, interval: "1h", side: "buy", slipBps: 100n,
   router: load("router") || CONFIG.ROUTER,
@@ -1089,7 +1109,9 @@ function renderSorts() {
   const cur = S.sort[S.src];
   const note = S.src === "curve" ? `<span class="note">newest ${CONFIG.PONS_LAUNCH_ROWS} launches · on-chain</span>` : S.src === "grad" ? `<span class="note">Pons v2 graduates + Pons v1</span>` : "";
   $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note +
+    (S.src !== "uni" ? `<span class="sf"><button data-sf="safe" aria-pressed="${S.safeOnly === "safe"}" title="Hide copycats, big dev bags and serial launchers">${SHIELD} Hide risky</button><button data-sf="verified" aria-pressed="${S.safeOnly === "verified"}" title="Only tokens whose website or Telegram shows this contract address">${SHIELD_OK} CA verified</button></span>` : "") +
     `<button class="qb-set" id="qb-set" title="Amount for one-click buys">${BOLT} Quick buy <b>${esc(S.qb)} ETH</b></button>`;
+  $("sorts").querySelectorAll("[data-sf]").forEach(b => b.onclick = () => { S.safeOnly = S.safeOnly === b.dataset.sf ? "" : b.dataset.sf; save("safe", S.safeOnly); renderTable(); });
   $("qb-set").onclick = (e) => { e.stopPropagation(); openQbPop($("qb-set")); };
   $("sorts").querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { S.sort[S.src] = b.dataset.sort; renderTable(); });
   $("src").style.setProperty("--i", SRC_I[S.src]);
@@ -1138,6 +1160,7 @@ async function renderTable() {
   }
   if (seq !== tableSeq) return;
   pools = pools.filter(venueOk);
+  if (S.src === "grad") pools = pools.filter(p => safeFilterOk(splitPool(p).base.id));
   let rows = pools.map(p => ({ p, ...splitPool(p) }));
   rows.forEach(r => r.t = S.tokens[lc(r.base.id)]);
   if (sort === "gainers") rows = rows.filter(r => r.t && r.t.change > 0).sort((a, b) => b.t.change - a.t.change);
@@ -1176,7 +1199,7 @@ async function renderCurveTable(seq) {
     renderSorts(); updateCounts();
   }
   const sort = S.sort.curve;
-  let rows = PONS.launches.filter(l => l.phase === 0 && l.symbol != null && isFinite(l.priceQ));
+  let rows = PONS.launches.filter(l => l.phase === 0 && l.symbol != null && isFinite(l.priceQ)).filter(l => safeFilterOk(l.id));
   rows.forEach(priceLaunch);                                         // ETH price may have arrived since the last read
   if (sort === "near") rows = rows.slice().sort((a, b) => (b.progress || 0) - (a.progress || 0));
   if (sort === "mcap") rows = rows.slice().sort((a, b) => (b.mcap || 0) - (a.mcap || 0));
@@ -1197,7 +1220,7 @@ async function renderCurveTable(seq) {
 
 // ---- row building blocks
 function assetCell(sym, name, id, tag, links, quoteSym) {
-  return `<div class="asset">${avHTML(sym, id)}<div class="meta"><div class="l1"><b>${esc(sym)}</b>${tag || ""}${quoteSym ? `<span class="muted pq">/ ${esc(quoteSym)}</span>` : ""}</div>` +
+  return `<div class="asset">${avHTML(sym, id)}<div class="meta"><div class="l1"><b>${esc(sym)}</b>${safeBadge(id)}${tag || ""}${quoteSym ? `<span class="muted pq">/ ${esc(quoteSym)}</span>` : ""}</div>` +
     `<div class="l2"><span class="nm">${esc(name || "")}</span>${links || ""}</div></div></div>`;
 }
 const BOLT = '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>';
@@ -1209,6 +1232,91 @@ function wireRows(body, poolOf) {
     tr.onclick = (e) => { if (e.target.closest("a,.star,[data-qb]")) return; openTrade(pool()); };
     tr.querySelector("[data-qb]").onclick = (e) => { e.stopPropagation(); quickBuy(pool()); };
   });
+}
+
+// ======================= SAFETY: CA verified + rug flags =======================
+// Signals, all public and checkable:
+//  - CA verified: the token's own website or public Telegram channel shows this exact contract address
+//  - Copycat: another Pons launch used the same ticker earlier
+//  - Dev bag: the creator wallet still holds a large share of the supply
+//  - Serial launcher: the same wallet launched many tokens recently
+//  - Creator tax on trades
+// Pons tokens are standard Pons contracts (fixed supply, no mint), so these are the main rug patterns left.
+const SAFE = {};
+const SHIELD = '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" d="M12 3l7 3v6c0 4.4-3 7.8-7 9-4-1.2-7-4.6-7-9V6z"/></svg>';
+const SHIELD_OK = '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M12 2l8 3.4V12c0 5-3.4 8.8-8 10-4.6-1.2-8-5-8-10V5.4z"/><path d="M8.2 12.2l2.6 2.6 5-5.2" fill="none" stroke="#141A00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const DEV_WARN = 0.10, SERIAL_WARN = 5;
+function firstOfTicker() {                       // ticker -> earliest launch id among the launches we know
+  const m = {}; for (const L of PONS.launches) { if (!L.symbol) continue; const k = L.symbol.trim().toUpperCase(); if (!m[k] || L.block < m[k].block) m[k] = L; } return m;
+}
+function safetyOf(id) {
+  id = lc(id); const s = SAFE[id] || {}, L = PONS.byId[id];
+  const first = L?.symbol ? firstOfTicker()[L.symbol.trim().toUpperCase()] : null;
+  const copycat = !!(first && first.id !== id);
+  const serial = L?.deployer && L.deployer !== ZERO ? PONS.launches.filter(x => x.deployer === L.deployer).length : 0;
+  const flags = [];
+  if (copycat) flags.push(`Copycat: ${L.symbol} was launched earlier by another token`);
+  if (s.devPct >= DEV_WARN) flags.push(`Creator wallet holds ${(s.devPct * 100).toFixed(1)}% of supply`);
+  if (serial >= SERIAL_WARN) flags.push(`Creator launched ${serial} tokens recently`);
+  if (L?.taxBps > 500) flags.push(`Creator tax ${(L.taxBps / 100).toFixed(1)}% per trade`);
+  const verified = (s.web === true || s.tg === true) && !copycat;
+  return { verified, risky: flags.length > 0, flags, s, copycat, serial, L };
+}
+function safeBadge(id) {
+  if (!isPonsId(id)) return "";
+  const r = safetyOf(id);
+  if (r.risky) return `<span class="sb risk" title="${esc(r.flags.join(" · "))}">!</span>`;
+  if (r.verified) return `<span class="sb ok" title="CA verified on the project's ${r.s.web === true ? "website" : ""}${r.s.web === true && r.s.tg === true ? " and " : ""}${r.s.tg === true ? "Telegram" : ""}">${SHIELD_OK}</span>`;
+  return "";
+}
+function safeFilterOk(id) {
+  if (!S.safeOnly) return true;
+  const r = safetyOf(id); if (S.safeOnly === "verified") return r.verified; return !r.risky;
+}
+// fill SAFE for tokens on screen: creator bag (one multicall) and the website/Telegram CA check (server)
+let safeTimer = null, safeBusy = false;
+function queueSafety() { clearTimeout(safeTimer); safeTimer = setTimeout(runSafety, 900); }
+async function runSafety() {
+  if (safeBusy) return; safeBusy = true;
+  try {
+    const ids = [...new Set([...document.querySelectorAll("[data-tok]")].map(e => e.dataset.tok))].filter(id => isPonsId(id) && !SAFE[id]).slice(0, 40);
+    if (!ids.length) return;
+    ids.forEach(id => SAFE[id] = { pending: true });
+    // creator of graduated tokens is not in the launch list: ask the factory
+    const needDep = ids.filter(id => !PONS.byId[id]?.deployer);
+    if (needDep.length) { const r = await multicall(needDep.map(id => [CONFIG.PONS_FACTORY, IFC(), "getLaunchedToken", [id]]));
+      needDep.forEach((id, i) => { const g = r[i]; if (g && g.exists) { const L = PONS.byId[id] || (PONS.byId[id] = { id, block: PONS.gradBlock[id] || 0, phase: Number(g.phase), symbol: null }); L.deployer = lc(g.deployer); L.taxBps = Number(g.creatorTaxBps); } }); }
+    const withDep = ids.filter(id => PONS.byId[id]?.deployer);
+    const r = await multicall(withDep.flatMap(id => [[id, IER(), "balanceOf", [PONS.byId[id].deployer]], [id, IER(), "totalSupply"]]));
+    withDep.forEach((id, i) => { const b = r[i * 2], t = r[i * 2 + 1]; SAFE[id].devPct = b != null && t ? Number(b * 10000n / t) / 10000 : null; });
+    // website / Telegram must show the CA (server fetches the pages)
+    if (CONFIG.VERIFY) {
+      const items = ids.map(id => ({ ca: id, web: SOC[id]?.web || null, tg: SOC[id]?.tg || null })).filter(x => x.web || x.tg);
+      for (let k = 0; k < items.length; k += 30) {
+        try { const res = await fetch(CONFIG.VERIFY, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(items.slice(k, k + 30)) }).then(r => r.json());
+          for (const v of res) if (SAFE[v.ca]) { SAFE[v.ca].web = v.web; SAFE[v.ca].tg = v.tg; } } catch {}
+      }
+    }
+    ids.forEach(id => { if (SAFE[id]) SAFE[id].pending = false; });
+    renderTable(); if (!$("tm").hidden) renderTmHead();
+  } catch {} finally { safeBusy = false; }
+}
+new MutationObserver(() => queueSafety()).observe(document.body, { childList: true, subtree: true });
+// panel for the trade window
+function safetyPanel(id) {
+  if (!isPonsId(id)) return "";
+  const r = safetyOf(id), s = r.s, row = (st, txt) => `<li class="${st}"><i>${st === "ok" ? "✓" : st === "bad" ? "!" : "·"}</i>${txt}</li>`;
+  const items = [
+    row("ok", "Standard Pons contract: fixed supply, no mint"),
+    row(s.web === true ? "ok" : s.web === false ? "warn" : "na", s.web === true ? "Website shows this CA" : s.web === false ? "Website does not show this CA" : SOC[id]?.web ? "Website: not checked yet" : "No website linked"),
+    row(s.tg === true ? "ok" : s.tg === false ? "warn" : "na", s.tg === true ? "Telegram channel shows this CA" : s.tg === false ? "Telegram does not show this CA" : SOC[id]?.tg ? "Telegram: not checked yet" : "No public Telegram linked"),
+    row(SOC[id]?.x ? "na" : "na", SOC[id]?.x ? "X linked (X can't be checked automatically)" : "No X linked"),
+    row(r.copycat ? "bad" : "ok", r.copycat ? "Copycat: same ticker launched earlier by another token" : "Original ticker"),
+    row(s.devPct == null ? "na" : s.devPct >= DEV_WARN ? "bad" : "ok", s.devPct == null ? "Creator bag: checking…" : `Creator wallet holds ${(s.devPct * 100).toFixed(2)}%`),
+    row(r.serial >= SERIAL_WARN ? "bad" : "ok", r.serial ? `Creator launched ${r.serial} token${r.serial > 1 ? "s" : ""} recently` : "Creator history: unknown"),
+  ];
+  const head = r.risky ? `<b class="bad">Caution</b>` : r.verified ? `<b class="ok">CA verified</b>` : `<b>Not verified</b>`;
+  return `<details class="safe"${r.risky ? " open" : ""}><summary>${r.verified ? SHIELD_OK : SHIELD} ${head}<span>${r.risky ? r.flags.length + " warning" + (r.flags.length > 1 ? "s" : "") : "safety checks"}</span></summary><ul>${items.join("")}</ul><p>Signals, not guarantees. Always check the CA yourself before buying.</p></details>`;
 }
 
 // ======================= PONS INDEX (on-chain) =======================
@@ -1310,7 +1418,7 @@ async function readLaunchState(list) {
   for (const L of list) {
     const g = r[k++];
     if (L.symbol == null) { L.symbol = String(r[k++] ?? "?"); L.name = String(r[k++] ?? ""); L.supplyRaw = r[k++]; L.dec = Number(r[k++] ?? 18); setLogo(L.id, r[k++]); setSocials(L.id, r[k++]); }
-    if (g && g.exists) { L.phase = Number(g.phase); L.curve = g.curve; L.pair = lc(g.pairToken); if (L.phase === 2) { PONS.grad.add(L.id); PONS.gradBlock[L.id] ||= L.block; } }
+    if (g && g.exists) { L.phase = Number(g.phase); L.curve = g.curve; L.pair = lc(g.pairToken); L.deployer = lc(g.deployer); L.taxBps = Number(g.creatorTaxBps); if (L.phase === 2) { PONS.grad.add(L.id); PONS.gradBlock[L.id] ||= L.block; } }
     else L.phase = -1;
   }
   // pair token details (ETH and USDG known; anything else read once)
@@ -2291,6 +2399,7 @@ function renderTmHead() {
   $("tm-head").innerHTML = `<div class="tm-tok">${avHTML(base.symbol, base.id)}<div style="min-width:0"><div class="tm-sym">${esc(base.symbol)} <span class="muted">/ ${esc(sel.quote.symbol || "")}</span></div>
     <div class="tm-sub"><span class="ellip">${esc(base.name || "")}</span>${linksHTML(base.id)}</div></div></div>
     <div class="tm-stats"><div><b>${t.price > 0 ? fmtPrice(t.price) : "—"}</b><span>Price</span></div><div><b>${isFinite(t.change) ? chipHTML(t.change) : "—"}</b><span>24h</span></div>${t.fdv > 0 ? `<div><b>${fmtUsd(t.fdv)}</b><span>Mkt cap</span></div>` : ""}</div>
+    ${safetyPanel(base.id)}
     ${pct != null ? `<div class="tm-grad"><span class="gm${pct >= 80 ? " hot" : ""}"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct.toFixed(1)}%</span></span><small>to graduation</small></div>` : ""}`;
 }
 function renderTmQb() { if ($("tm").hidden) return; $("tm-qb").innerHTML = `${BOLT} Buy ${esc(S.qb)} ETH`; }

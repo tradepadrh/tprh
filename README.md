@@ -72,6 +72,13 @@ sample data there. Use Railway (or any Node host) for live data.
 - Graduated Pons tokens and new Uniswap v4 pools get charts built on-chain: the bonding-curve trades before
   graduation plus the pool's Swap events after it.
 
+## Safety checks (CA verified, rug flags)
+For Pons tokens the lists show a lime shield when the token's own website or public Telegram channel shows this
+exact contract address (`POST /verify`, fetched by the server with SSRF protection), and an amber "!" for
+rug patterns: copycat ticker, creator wallet holding 10%+ of supply, a creator with 5+ recent launches, or a
+creator tax above 5%. "Hide risky" and "CA verified" filter the lists. X links can't be checked automatically.
+These are signals, not guarantees.
+
 ## 3. Deploy the router contract (from your own computer, not Railway)
 The router supports:
 - **Pons v1 launches** (most live Pons tokens): Uniswap V3 pool against WETH, 1% fee tier.
