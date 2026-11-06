@@ -893,12 +893,29 @@ function paintAvatars() {
       const im = new Image(); im.alt = ""; im.decoding = "async"; im.referrerPolicy = "no-referrer"; im.onload = () => im.classList.add("ok"); im.onerror = () => tpImgFail(im); im.src = u; el.appendChild(im); }); });
 }
 new MutationObserver(() => paintAvatars()).observe(document.body, { childList: true, subtree: true });
+// tokens without a Pons logo: the explorer's token icon (Robinhood stock tokens, CoinGecko-listed coins).
+// Answers are remembered in this browser for a day, so each token is looked up once.
+const ICON_CACHE = (() => { try { return JSON.parse(localStorage.getItem("tradepad.icons") || "{}"); } catch { return {}; } })();
+const saveIcons = () => { try { localStorage.setItem("tradepad.icons", JSON.stringify(ICON_CACHE)); } catch {} };
+for (const [id, v] of Object.entries(ICON_CACHE)) if (v && v.u && Date.now() - v.t < 86400000 && !IMG[id]) IMG[id] = v.u;
+async function explorerIcons(ids) {
+  const todo = ids.filter(id => !IMG[id] && !(ICON_CACHE[id] && Date.now() - ICON_CACHE[id].t < 86400000)).slice(0, 40);
+  let i = 0;
+  const worker = async () => { while (i < todo.length) { const id = todo[i++];
+    let u = "";
+    try { const r = await fetch(`${CONFIG.EXPLORER}/api/v2/tokens/${id}`, { headers: { accept: "application/json" } });
+      if (r.ok) { const j = await r.json(); if (/^https:\/\/[^\s"'<>]+$/.test(j.icon_url || "")) u = j.icon_url; } } catch {}
+    ICON_CACHE[id] = { u, t: Date.now() }; if (u && !IMG[id]) { IMG[id] = u; paintAvatars(); } } };
+  await Promise.all([worker(), worker(), worker()]); saveIcons();
+}
 // Pons tokens on screen without an image: ask their contract for logo() in one multicall
 let logoTimer = null;
 function queueLogos() { clearTimeout(logoTimer); logoTimer = setTimeout(async () => {
   const ids = [...new Set([...document.querySelectorAll("[data-tok]")].map(e => e.dataset.tok))].filter(id => /^0x[0-9a-f]{40}$/.test(id) && !IMG[id] && !LOGO_TRIED.has(id) && !QUOTES.has(id)).slice(0, 120);
   if (!ids.length) return; ids.forEach(id => LOGO_TRIED.add(id));
-  try { const r = await multicall(ids.map(id => [id, IER(), "logo"])); ids.forEach((id, i) => setLogo(id, r[i])); } catch {}
+  let missing = ids;
+  try { const r = await multicall(ids.map(id => [id, IER(), "logo"])); ids.forEach((id, i) => setLogo(id, r[i])); missing = ids.filter(id => !IMG[id]); } catch {}
+  explorerIcons(missing);
   // graduated Pons rows also get their X / website links
   const soc = ids.filter(id => isPonsId(id) && !SOC[id]);
   if (soc.length) { try { const r = await multicall(soc.map(id => [id, IER(), "socials"])); soc.forEach((id, i) => setSocials(id, r[i])); if (S.src === "grad") renderTable(); } catch {} }
