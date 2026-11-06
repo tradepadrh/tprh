@@ -37,6 +37,10 @@ git push -u origin main
 | `DEXPAPRIKA_API` | no | `https://api.dexpaprika.com` | Override API base. |
 | `ROADMAP_PHASE` | no | `1` | Roadmap phase that is live in the navbar (1 Trade, 2 Launch, 3 Radar, 4 Portfolio). Default 1. |
 | `WALLETCONNECT_PROJECT_ID` | recommended | `3f2c…` (32 hex) | Free project id from cloud.reown.com. Turns on WalletConnect (QR + mobile wallets). Public value, not a secret. In Reown, add your site domain to the allowlist. |
+| `TOKEN_CA` | no | `0xAbC…` | Your project's token address, shown in the bar at the top with Copy and Buy buttons. |
+| `TOKEN_SYMBOL` | no | `TP` | Ticker shown next to the CA (without `$`). |
+| `X_URL` | no | `https://x.com/yourhandle` or `@yourhandle` | Your X account, shown in the top bar. |
+| `TELEGRAM_URL` | no | `https://t.me/yourgroup` | Optional Telegram link in the top bar. |
 | `PUBLIC_RPC_URL` | no | `https://rpc.mainnet.chain.robinhood.com` | Read-only RPC the browser uses for the Pons curve list. Public URLs only (it is visible to visitors). |
 
 The assets table has a three-way menu: **Pons curve** (Pons v2 launches still on the bonding curve, read

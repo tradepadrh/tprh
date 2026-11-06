@@ -116,6 +116,20 @@ details.safe li i { font-style: normal; width: 16px; text-align: center; font-we
 details.safe li.ok i { color: var(--volt); } details.safe li.warn i, details.safe li.bad i { color: #F4C97C; } details.safe li.bad { color: #F4C97C; } details.safe li.na { color: var(--muted); }
 details.safe p { margin: 4px 14px 12px; font-size: 11px; color: var(--faint); }
 @container tbl (max-width: 620px) { .sf button { padding: 0 9px; } }
+/* ---- project bar: your token CA and socials (set on Railway) */
+.proj { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 8px 8px 14px; border-radius: 22px; margin-bottom: 12px; border: 1px solid rgba(204, 255, 4, .35); box-shadow: 0 0 0 1px rgba(204, 255, 4, .06), 0 10px 40px rgba(204, 255, 4, .07); }
+.proj[hidden] { display: none; }
+.proj .sym { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; }
+.proj .sym .av { width: 26px; height: 26px; font-size: 9px; }
+.proj .lbl { font-size: 10px; font-weight: 800; letter-spacing: .18em; color: var(--volt); padding: 4px 8px; border-radius: 99px; background: rgba(204, 255, 4, .1); }
+.proj .ca { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; font-weight: 600; color: var(--fg); background: rgba(0, 0, 0, .28); border: 1px solid var(--line); border-radius: 12px; padding: 7px 12px; user-select: all; cursor: copy; word-break: break-all; }
+.proj .ca .short { display: none; }
+.proj .pb { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); font-weight: 700; font-size: 13px; text-decoration: none; }
+.proj .pb:hover { border-color: rgba(204, 255, 4, .5); }
+.proj .pb.buy { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); }
+.proj .pb svg { width: 14px; height: 14px; }
+.proj .sp { flex: 1; }
+@media (max-width: 760px) { .proj .pb.exp { display: none; } .proj .ca .full { display: none; } .proj .ca .short { display: inline; } .proj .sp { display: none; } .proj { padding: 8px; gap: 8px; } }
 /* ---- trade window */
 .tm { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 18px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
 .tm[hidden] { display: none; }
@@ -480,6 +494,7 @@ th.r, td.r { text-align: right; }
 <div class="bg" aria-hidden="true"></div>
 <div class="app">
   <div style="min-width:0">
+    <div class="proj glass" id="proj" hidden></div>
     <header class="top">
       <div class="logo glass" aria-label="TradePad"><svg viewBox="8 14 160 160" width="26" height="26" aria-hidden="true"><path fill="var(--volt)" d="M44 41 H150 C158 41 164.5 47 164.5 55 V61.5 L130.5 115.5 C128.5 118.5 125.5 119.5 122 119.5 H92.5 L76.5 147 H53 L82 101 H115.5 L140 61.5 H32.5 Z"/><path fill="var(--volt)" d="M25 71 H122 L109.5 91.5 H73.5 L39.5 147 H16.5 L51 91.5 H12.5 Z"/></svg></div>
       <nav class="nav road glass" id="road" aria-label="Roadmap"></nav>
@@ -2348,6 +2363,40 @@ function openPhase(n) {
   if (window.gsap && !REDUCED) gsap.fromTo(".rm-card", { y: 24, opacity: .001, scale: .98 }, { y: 0, opacity: 1, scale: 1, duration: .45, ease: "power3.out" });
 }
 function closePhase() { $("rm").hidden = true; }
+
+// ======================= PROJECT BAR =======================
+// TOKEN_CA, TOKEN_SYMBOL, X_URL and TELEGRAM_URL come from Railway variables through /config.js
+function renderProject() {
+  const ca = /^0x[0-9a-fA-F]{40}$/.test(CONFIG.TOKEN_CA || "") ? CONFIG.TOKEN_CA : "", x = CONFIG.X_URL, tg = CONFIG.TELEGRAM_URL;
+  if (!ca && !x && !tg) return;
+  const sym = CONFIG.TOKEN_SYMBOL || "TP", el = $("proj");
+  const handle = x ? "@" + x.split("/").pop() : "";
+  el.innerHTML = (ca ? `<span class="sym">${avHTML(sym, ca)}$${esc(sym)}</span><span class="lbl">CA</span>
+      <span class="ca" id="proj-ca" title="Click to copy"><span class="full">${esc(ca)}</span><span class="short">${esc(short(ca))}</span></span>
+      <button class="pb" id="proj-copy">Copy CA</button>
+      <button class="pb buy" id="proj-buy">${BOLT} Buy $${esc(sym)}</button>` : "") +
+    `<span class="sp"></span>` +
+    (x ? `<a class="pb" href="${esc(x)}" target="_blank" rel="noopener noreferrer">${ICO.x}${esc(handle)}</a>` : "") +
+    (tg ? `<a class="pb" href="${esc(tg)}" target="_blank" rel="noopener noreferrer">${ICO.tg}Telegram</a>` : "") +
+    (ca ? `<a class="pb exp" href="${CONFIG.EXPLORER}/token/${ca}" target="_blank" rel="noopener noreferrer">Explorer</a>` : "");
+  el.hidden = false;
+  if (ca) {
+    const cp = () => copy(ca, $("proj-copy"), "Copy CA");
+    $("proj-copy").onclick = cp; $("proj-ca").onclick = cp;
+    $("proj-buy").onclick = () => openProjectTrade(lc(ca));
+  }
+}
+async function openProjectTrade(ca) {
+  // Pons curve launch → curve window; anything else → its DexPaprika pool
+  try { if (!PONS.ready) await loadPons().catch(() => {}); } catch {}
+  let L = PONS.byId[ca];
+  if (!L || L.symbol == null) { L = PONS.byId[ca] || (PONS.byId[ca] = { id: ca, block: PONS.head?.block || 0, phase: null, symbol: null }); try { await readLaunchState([L]); } catch {} }
+  if (L.phase === 0 && isFinite(L.priceQ)) return openTrade(curvePool(L));
+  await getToken(ca); const pool = poolForToken(ca);
+  if (pool) return openTrade(pool);
+  showMsg("This token has no pool yet.", "err");
+}
+renderProject();
 
 // ======================= QUICK BUY AMOUNT =======================
 const QB_PRESETS = ["0.005", "0.01", "0.025", "0.05", "0.1", "0.25"];

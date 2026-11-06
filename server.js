@@ -34,6 +34,16 @@ function buildConfig() {
   if (process.env.EXPLORER_URL) cfg.EXPLORER = process.env.EXPLORER_URL.replace(/\/+$/, "");
   const phase = Number(process.env.ROADMAP_PHASE);
   if (Number.isInteger(phase) && phase >= 1 && phase <= 4) cfg.PHASE = phase;   // roadmap: phases up to this one are live
+  // project info shown at the top of the page: edit these on Railway, no code change needed
+  const ca = (process.env.TOKEN_CA || "").trim();
+  if (ADDRESS_RE.test(ca)) cfg.TOKEN_CA = ca;
+  const sym = (process.env.TOKEN_SYMBOL || "").trim().replace(/^\$/, "");
+  if (/^[A-Za-z0-9]{1,12}$/.test(sym)) cfg.TOKEN_SYMBOL = sym;
+  const x = (process.env.X_URL || "").trim();
+  if (/^@?[A-Za-z0-9_]{1,15}$/.test(x)) cfg.X_URL = "https://x.com/" + x.replace(/^@/, "");
+  else if (/^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/?$/i.test(x)) cfg.X_URL = x.replace(/\/$/, "");
+  const tg = (process.env.TELEGRAM_URL || "").trim();
+  if (/^https:\/\/t\.me\/[A-Za-z0-9_+]{3,64}\/?$/i.test(tg)) cfg.TELEGRAM_URL = tg;
   // WalletConnect (mobile wallets, QR). A public project id from cloud.reown.com, not a secret.
   if (/^[0-9a-f]{32}$/i.test((process.env.WALLETCONNECT_PROJECT_ID || "").trim())) cfg.WC_PROJECT_ID = process.env.WALLETCONNECT_PROJECT_ID.trim();
   // public read-only RPC used by the browser for the Pons launch list (never put a private RPC key here)
