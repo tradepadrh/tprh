@@ -69,6 +69,77 @@ a { color: inherit; }
 .link { width: 18px; height: 2px; border-radius: 2px; background: var(--line); flex: none; }
 .link.done { background: var(--volt); box-shadow: 0 0 8px rgba(204, 255, 4, .5); }
 @media (max-width: 1240px) { .ph .st { display: none; } }
+/* ---- rows: two-line asset cell, responsive columns, sticky trade buttons */
+tr.row-go { cursor: pointer; }
+.asset .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.asset .l1 { display: flex; align-items: center; gap: 6px; } .asset .l1 b { font-size: 14px; }
+.asset .l2 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.asset .l2 .nm { font-size: 12px; max-width: 150px; }
+.asset .pq { font-size: 11px; }
+.asset .links { margin-left: 2px; }
+.asset .links .lk { width: 20px; height: 20px; } .asset .links .lk.pons { width: auto; height: 20px; padding: 0 6px; font-size: 9.5px; }
+th.act, td.act { position: sticky; right: 0; z-index: 1; background: linear-gradient(90deg, rgba(34, 30, 25, 0), rgba(34, 30, 25, .94) 14px); padding-left: 22px; }
+th.act { background: rgba(34, 30, 25, .0); }
+.acts { display: inline-flex; gap: 6px; align-items: center; }
+.qb { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 99px; border: 0; background: var(--volt); color: var(--volt-fg); font-weight: 800; font-size: 12px; box-shadow: 0 6px 18px rgba(204, 255, 4, .2); transition: transform .15s, box-shadow .15s; }
+.qb:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(204, 255, 4, .35); }
+.qb.big { height: 44px; padding: 0 20px; font-size: 15px; flex: 1; justify-content: center; }
+.qb-set { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid rgba(204, 255, 4, .35); background: rgba(204, 255, 4, .07); color: var(--fg); font-size: 12px; font-weight: 600; margin-left: auto; }
+.qb-set svg { color: var(--volt); } .qb-set b { color: var(--volt); }
+.qb-set.wide { width: 100%; height: 42px; justify-content: center; margin: 0; }
+/* columns follow the table card's own width, not the screen */
+#c-table { container: tbl / inline-size; }
+@container tbl (max-width: 920px) { .c-launch { display: none; } }
+@container tbl (max-width: 780px) { .c-mcap, .c-chg { display: none; } .sorts .note { display: none; } .acts .btn-s { display: none; } .gm .bar { width: 72px; } }
+@container tbl (max-width: 620px) {
+  .c-vol, .c-star { display: none; } th, td { padding: 9px 10px; } .gm .bar { width: 52px; } .gm span { min-width: 34px; font-size: 11px; }
+  .asset .l2 .nm { display: none; } .acts .btn-s { display: none; }
+}
+@container tbl (max-width: 480px) { .asset .l2 { display: none; } .asset .av { width: 28px; height: 28px; } td.b { font-size: 13px; } th.act, td.act { padding-left: 14px; } }
+@container tbl (max-width: 400px) { .c-grad { display: none; } }
+/* ---- trade window */
+.tm { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 18px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
+.tm[hidden] { display: none; }
+.tm-card { width: min(440px, 100%); max-height: calc(100dvh - 36px); overflow: auto; border-radius: 30px; padding: 16px; background: rgba(32, 28, 23, .95); display: grid; gap: 12px; overscroll-behavior: contain; }
+.tm-top { display: flex; gap: 10px; align-items: flex-start; }
+.tm-head { flex: 1; min-width: 0; display: grid; gap: 12px; }
+.tm-tok { display: flex; gap: 12px; align-items: center; min-width: 0; } .tm-tok .av { width: 44px; height: 44px; font-size: 13px; }
+.tm-sym { font-size: 19px; font-weight: 700; } .tm-sym .muted { font-size: 13px; font-weight: 500; }
+.tm-sub { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); min-width: 0; } .tm-sub .ellip { max-width: 160px; }
+.tm-stats { display: flex; gap: 22px; } .tm-stats b { display: block; font-size: 16px; font-weight: 600; } .tm-stats b.chip { display: inline-flex; } .tm-stats span { font-size: 11px; color: var(--muted); }
+.tm-grad { display: flex; align-items: center; gap: 10px; } .tm-grad .gm .bar { width: 160px; } .tm-grad small { color: var(--muted); font-size: 11px; }
+.tm-quick { display: flex; gap: 8px; align-items: center; } .tm-quick .qb-set { margin: 0; height: 44px; }
+.tm-status { font-size: 13px; padding: 10px 14px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+.tm-status svg { color: var(--volt); } .tm-status.busy { border-color: rgba(204, 255, 4, .35); } .tm-status.err { border-color: rgba(255, 140, 120, .5); color: #ffb4a6; } .tm-status.ok { border-color: var(--volt); color: var(--volt); }
+.tm-body #c-swap { box-shadow: none; background: transparent; border: 0; backdrop-filter: none; }
+.tm-body #c-swap .swap-in { padding: 0; }
+@media (max-width: 560px) { .tm { place-items: end stretch; padding: 0; } .tm-card { width: 100%; border-radius: 26px 26px 0 0; max-height: 92dvh; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); } .tm-quick .qb-set#tm-chart { display: none; } }
+body.noscroll { overflow: hidden; }
+/* ---- quick buy popover */
+.qbpop { position: fixed; z-index: 70; padding: 14px; border-radius: 20px; background: rgba(32, 28, 23, .97); box-shadow: var(--shadow); display: grid; gap: 10px; }
+.qbpop[hidden] { display: none; }
+.qb-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.qb-presets button { height: 34px; border-radius: 12px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); font-weight: 700; font-size: 13px; }
+.qb-presets button[aria-pressed="true"] { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); }
+.qb-row { display: flex; gap: 8px; align-items: center; } .qb-row input { flex: 1; min-width: 0; height: 36px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0, 0, 0, .25); color: var(--fg); padding: 0 12px; font: inherit; font-weight: 700; } .qb-row span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.qb-note { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.45; }
+/* ---- menu (narrow screens) */
+.menu-btn { display: none; width: 44px; height: 44px; border-radius: 50%; place-items: center; color: var(--fg); border: 0; }
+@media (max-width: 1100px) { .menu-btn { display: grid; } #road { display: none; } }
+@media (max-width: 560px) { .status { display: none; } }
+.drawer { position: fixed; inset: 0; z-index: 58; background: rgba(10, 8, 6, .5); backdrop-filter: blur(4px); display: flex; justify-content: flex-end; }
+.drawer[hidden] { display: none; }
+.dr-card { width: min(340px, 88vw); height: 100%; overflow: auto; padding: 18px; background: rgba(30, 26, 22, .97); border-radius: 26px 0 0 26px; display: flex; flex-direction: column; gap: 8px; }
+.dr-top { display: flex; align-items: center; justify-content: space-between; font-size: 18px; margin-bottom: 4px; }
+.dr-k { font-size: 10px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--volt); margin: 10px 2px 2px; }
+.dr-list { display: grid; gap: 4px; }
+.dr-list button { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: 14px; border: 1px solid transparent; background: var(--soft); color: var(--fg); font-weight: 600; font-size: 14px; text-align: left; }
+.dr-list button:hover { border-color: rgba(204, 255, 4, .4); }
+.dr-list button span { margin-left: auto; color: var(--faint); font-size: 18px; }
+.road-list i { font-style: normal; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 800; border: 1px solid var(--line); }
+.road-list em { margin-left: auto; font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .12em; color: var(--faint); }
+.road-list button[data-s="live"] i { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); } .road-list button[data-s="live"] em { color: var(--volt); }
+.road-list button[data-s="next"] em { color: var(--warn); }
 /* wallet picker */
 .wm-list { display: grid; gap: 8px; margin: 14px 0 6px; }
 .wm-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); text-align: left; transition: border-color .2s, background .2s; }
@@ -236,7 +307,7 @@ a { color: inherit; }
 .tok-s { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .hstat b { display: block; font-size: 20px; font-weight: 500; letter-spacing: -.02em; } .hstat span { font-size: 11px; color: var(--muted); }
 .hstat b.chip { font-size: 18px; display: flex; font-weight: 700; }
-@media (max-width: 1520px) { .hstat.opt { display: none; } .asset .nm, .asset .pq { display: none; } }
+@media (max-width: 1520px) { .hstat.opt { display: none; } }
 .ch-head .btn-s { margin-left: auto; }
 .copy { border: 0; background: var(--soft); padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; color: var(--muted); }
 .ch-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px 0; flex-wrap: wrap; }
@@ -388,6 +459,7 @@ th.r, td.r { text-align: right; }
       <nav class="nav road glass" id="road" aria-label="Roadmap"></nav>
       <span class="grow"></span>
       <span class="status glass" id="status" data-s="live"><i></i><span id="status-t">Robinhood Chain</span></span>
+      <button class="menu-btn glass" id="menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
       <button class="wallet glass" id="connect"><span class="av" id="w-av" style="background:rgba(255,255,255,.14)"><svg width="14" height="14"><use href="#i-wallet"/></svg></span><span id="w-t">Connect</span></button>
     </header>
 
@@ -589,6 +661,28 @@ th.r, td.r { text-align: right; }
   </div>
 </div>
 
+<div class="tm" id="tm" hidden role="dialog" aria-modal="true" aria-label="Trade">
+  <div class="tm-card glass">
+    <div class="tm-top"><div class="tm-head" id="tm-head"></div><button class="icon-btn" id="tm-x" aria-label="Close">✕</button></div>
+    <div class="tm-quick"><button class="qb big" id="tm-qb"></button><button class="qb-set" id="tm-qbset" title="Change the quick buy amount">Edit amount</button><button class="qb-set" id="tm-chart">Chart</button></div>
+    <div class="tm-status" id="tm-status" hidden></div>
+    <div class="tm-body" id="tm-body"></div>
+  </div>
+</div>
+<div class="qbpop glass" id="qbpop" hidden role="dialog" aria-label="Quick buy amount">
+  <div class="rm-k" style="font-size:10px">Quick buy amount</div>
+  <div class="qb-presets" id="qb-presets"></div>
+  <div class="qb-row"><input id="qb-in" inputmode="decimal" autocomplete="off" aria-label="Custom amount in ETH"><span>ETH</span><button class="btn btn-s" id="qb-save">Save</button></div>
+  <p class="qb-note">One click fills the trade window and presses Buy. Your wallet still asks you to confirm.</p>
+</div>
+<div class="drawer" id="drawer" hidden>
+  <aside class="dr-card glass" aria-label="Menu">
+    <div class="dr-top"><b>TradePad</b><button class="icon-btn" id="dr-x" aria-label="Close menu">✕</button></div>
+    <div class="dr-k">Go to</div><div class="dr-list" id="dr-sec"></div>
+    <div class="dr-k">Settings</div><button class="qb-set wide" id="dr-qb"></button>
+    <div class="dr-k">Roadmap</div><div class="dr-list road-list" id="dr-road"></div>
+  </aside>
+</div>
 <div class="rm" id="wm" hidden role="dialog" aria-modal="true" aria-labelledby="wm-t">
   <div class="rm-card glass wm-card">
     <button class="icon-btn rm-x" id="wm-x" aria-label="Close">✕</button>
@@ -698,6 +792,7 @@ const ABI = {
 const S = {
   net: CONFIG.NETWORK_HINT, sample: false,
   pools: [], allPools: null, newPools: null, newAt: 0, extra: [], venue: "", trendTab: "volume",
+  qb: /^\d*\.?\d+$/.test(load("qb")) ? load("qb") : "0.01",
   src: ["curve", "grad", "uni"].includes(load("src")) ? load("src") : "curve", sort: { curve: "new", grad: "volume", uni: "volume" },
   sel: null, interval: "1h", side: "buy", slipBps: 100n,
   router: load("router") || CONFIG.ROUTER,
@@ -964,7 +1059,9 @@ const SRC_I = { curve: 0, grad: 1, uni: 2 };
 function renderSorts() {
   const cur = S.sort[S.src];
   const note = S.src === "curve" ? `<span class="note">newest ${CONFIG.PONS_LAUNCH_ROWS} launches · on-chain</span>` : S.src === "grad" ? `<span class="note">Pons v2 graduates + Pons v1</span>` : "";
-  $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note;
+  $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note +
+    `<button class="qb-set" id="qb-set" title="Amount for one-click buys">${BOLT} Quick buy <b>${esc(S.qb)} ETH</b></button>`;
+  $("qb-set").onclick = (e) => { e.stopPropagation(); openQbPop($("qb-set")); };
   $("sorts").querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { S.sort[S.src] = b.dataset.sort; renderTable(); });
   $("src").style.setProperty("--i", SRC_I[S.src]);
   $("src").querySelectorAll("[data-src]").forEach(b => b.setAttribute("aria-selected", b.dataset.src === S.src));
@@ -982,8 +1079,8 @@ function allLoadedPools() {
   return out;
 }
 const THEAD = {
-  std: (newCol) => `<th style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r">${newCol}</th><th class="r">24h change</th><th class="r">Action</th>`,
-  curve: `<th>Asset</th><th class="r">Price</th><th class="r">Market cap</th><th>Graduation</th><th class="r">Launched</th><th class="r">Action</th>`,
+  std: (newCol) => `<th class="c-star" style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r c-vol">${newCol}</th><th class="r c-chg">24h change</th><th class="r act">Trade</th>`,
+  curve: `<th>Asset</th><th class="r">Price</th><th class="r c-mcap">Market cap</th><th class="c-grad">Graduation</th><th class="r c-launch">Launched</th><th class="r act">Trade</th>`,
 };
 function updateCounts() {
   const live = PONS.launches.filter(l => l.phase === 0).length;
@@ -1029,14 +1126,14 @@ async function renderTable() {
     const id = lc(base.id);
     const tag = S.src === "grad" ? (PONS.grad.has(id) ? ' <span class="tag">v2</span>' : ' <span class="tag v1">v1</span>') : "";
     const col4 = sort === "new" ? (S.src === "grad" ? (PONS.gradBlock[id] ? ago(blockTime(PONS.gradBlock[id])) : "—") : ago(p.created_at)) : fmtUsd(p.volume_usd);
-    return `<tr>
-    <td>${starBtn(base.id)}</td>
-    <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b>${tag}<span class="nm">${esc(base.name || "")}</span>${S.src === "grad" ? linksHTML(base.id) : ""}<span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
+    return `<tr class="row-go" data-pool="${esc(p.id)}">
+    <td class="c-star">${starBtn(base.id)}</td>
+    <td>${assetCell(base.symbol, base.name, base.id, tag, S.src === "grad" ? linksHTML(base.id) : "", quote.symbol)}</td>
     <td class="r b">${t && t.price > 0 ? fmtPrice(t.price) : "—"}</td>
-    <td class="r">${col4}</td>
-    <td class="r">${t ? chipHTML(t.change) : '<span class="muted">—</span>'}</td>
-    <td class="r"><button class="btn btn-s" data-pool="${esc(p.id)}">Trade</button></td></tr>`; }).join("");
-  body.querySelectorAll("[data-pool]").forEach(b => b.onclick = () => { selectPool(pools.find(x => x.id === b.dataset.pool)); jump("c-chart"); });
+    <td class="r c-vol">${col4}</td>
+    <td class="r c-chg">${t ? chipHTML(t.change) : '<span class="muted">—</span>'}</td>
+    <td class="r act">${actCell()}</td></tr>`; }).join("");
+  wireRows(body, (id) => pools.find(x => x.id === id));
   wireStars(body);
 }
 async function renderCurveTable(seq) {
@@ -1059,14 +1156,30 @@ async function renderCurveTable(seq) {
   body.innerHTML = rows.map(L => {
     const pct = Math.max(0, Math.min(1, L.progress || 0)) * 100;
     const price = L.priceUsd > 0 ? fmtPrice(L.priceUsd) : L.priceQ > 0 ? fmtSmall(L.priceQ) + " " + esc(L.pairSym) : "—";
-    return `<tr>
-    <td><div class="asset">${avHTML(L.symbol, L.id)}<b>${esc(L.symbol)}</b><span class="nm">${esc(L.name || "")}</span>${linksHTML(L.id)}${L.pairSym !== "ETH" ? `<span class="muted pq" style="font-size:11px">/ ${esc(L.pairSym)}</span>` : ""}</div></td>
+    return `<tr class="row-go" data-launch="${esc(L.id)}">
+    <td>${assetCell(L.symbol, L.name, L.id, "", linksHTML(L.id), L.pairSym !== "ETH" ? L.pairSym : "")}</td>
     <td class="r b">${price}</td>
-    <td class="r">${L.mcap > 0 ? fmtUsd(L.mcap) : "—"}</td>
-    <td><span class="gm${pct >= 80 ? " hot" : ""}" title="${fmtNum(L.raised, 4)} of ${fmtNum(L.threshold, 4)} ${esc(L.pairSym)} raised"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct < 10 ? pct.toFixed(1) : pct.toFixed(0)}%</span></span></td>
-    <td class="r muted">${ago(blockTime(L.block))}</td>
-    <td class="r"><button class="btn btn-s" data-launch="${esc(L.id)}">Trade</button></td></tr>`; }).join("");
-  body.querySelectorAll("[data-launch]").forEach(b => b.onclick = () => { selectPool(curvePool(PONS.byId[b.dataset.launch])); jump("c-chart"); });
+    <td class="r c-mcap">${L.mcap > 0 ? fmtUsd(L.mcap) : "—"}</td>
+    <td class="c-grad"><span class="gm${pct >= 80 ? " hot" : ""}" title="${fmtNum(L.raised, 4)} of ${fmtNum(L.threshold, 4)} ${esc(L.pairSym)} raised"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct < 10 ? pct.toFixed(1) : pct.toFixed(0)}%</span></span></td>
+    <td class="r muted c-launch">${ago(blockTime(L.block))}</td>
+    <td class="r act">${actCell()}</td></tr>`; }).join("");
+  wireRows(body, (id) => curvePool(PONS.byId[id]));
+}
+
+// ---- row building blocks
+function assetCell(sym, name, id, tag, links, quoteSym) {
+  return `<div class="asset">${avHTML(sym, id)}<div class="meta"><div class="l1"><b>${esc(sym)}</b>${tag || ""}${quoteSym ? `<span class="muted pq">/ ${esc(quoteSym)}</span>` : ""}</div>` +
+    `<div class="l2"><span class="nm">${esc(name || "")}</span>${links || ""}</div></div></div>`;
+}
+const BOLT = '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>';
+const actCell = () => `<div class="acts"><button class="qb" data-qb title="Quick buy ${esc(S.qb)} ETH">${BOLT}<span>${esc(S.qb)}</span></button><button class="btn btn-s" data-trade>Trade</button></div>`;
+// a click anywhere on a row opens the trade window; the bolt buys right away (the wallet still asks to confirm)
+function wireRows(body, poolOf) {
+  body.querySelectorAll("tr.row-go").forEach(tr => {
+    const id = tr.dataset.launch || tr.dataset.pool, pool = () => poolOf(id);
+    tr.onclick = (e) => { if (e.target.closest("a,.star,[data-qb]")) return; openTrade(pool()); };
+    tr.querySelector("[data-qb]").onclick = (e) => { e.stopPropagation(); quickBuy(pool()); };
+  });
 }
 
 // ======================= PONS INDEX (on-chain) =======================
@@ -2033,6 +2146,7 @@ function errText(e) {
   if (rv === "UnsupportedPhase") return "This token is graduating or its curve is closed right now. Try again in a minute.";
   if (rv === "UnknownToken") return "This token is not a Pons launch.";
   if (rv === "Expired") return "The transaction took too long and expired. Try again.";
+  if (/missing revert data|CALL_EXCEPTION/i.test(m)) return "This trade would fail on-chain right now (price moved, curve closing or not enough liquidity). Try again or use a smaller amount.";
   if (/unknown custom error/i.test(m)) return "The Pons curve rejected this trade (price moved, anti-snipe limit or curve full). Try a smaller amount or try again.";
   if (/InsufficientOutput|SlippageExceeded/i.test(m)) return "Price moved beyond your slippage limit. Raise slippage or try again.";
   if (/NoPool/i.test(m)) return "This token has no Uniswap V3 WETH pool at that fee tier.";
@@ -2097,6 +2211,108 @@ function openPhase(n) {
   if (window.gsap && !REDUCED) gsap.fromTo(".rm-card", { y: 24, opacity: .001, scale: .98 }, { y: 0, opacity: 1, scale: 1, duration: .45, ease: "power3.out" });
 }
 function closePhase() { $("rm").hidden = true; }
+
+// ======================= QUICK BUY AMOUNT =======================
+const QB_PRESETS = ["0.005", "0.01", "0.025", "0.05", "0.1", "0.25"];
+function openQbPop(anchor) {
+  const pop = $("qbpop"); pop.hidden = false;
+  $("qb-presets").innerHTML = QB_PRESETS.map(v => `<button data-v="${v}" aria-pressed="${v === S.qb}">${v}</button>`).join("");
+  $("qb-in").value = S.qb;
+  $("qb-presets").querySelectorAll("button").forEach(b => b.onclick = () => setQb(b.dataset.v));
+  const r = anchor.getBoundingClientRect(), w = Math.min(300, innerWidth - 24);
+  pop.style.width = w + "px"; pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.right - w)) + "px"; pop.style.top = Math.min(innerHeight - 240, r.bottom + 8) + "px";
+}
+function setQb(v) {
+  v = String(v).trim(); if (!/^\d*\.?\d+$/.test(v) || Number(v) <= 0 || Number(v) > 100) { $("qb-in").setCustomValidity("Enter an ETH amount"); $("qb-in").reportValidity(); return; }
+  S.qb = String(Number(v)); save("qb", S.qb); $("qbpop").hidden = true; renderTable(); renderTmQb();
+}
+$("qb-save").onclick = () => setQb($("qb-in").value);
+$("qb-in").addEventListener("keydown", (e) => { if (e.key === "Enter") setQb($("qb-in").value); });
+document.addEventListener("click", (e) => { if (!$("qbpop").hidden && !e.target.closest("#qbpop,#qb-set,#tm-qbset,#dr-qb")) $("qbpop").hidden = true; });
+
+// ======================= TRADE WINDOW =======================
+// The swap card itself moves into the window, so every route, quote and safety check stays the same.
+let swapHome = null;
+function openTrade(pool, opts = {}) {
+  if (!pool) return;
+  const ready = S.sel?.pool.id !== pool.id ? selectPool(pool) : Promise.resolve();
+  const card = $("c-swap");
+  if (!swapHome) { swapHome = document.createComment("swap-home"); card.parentNode.insertBefore(swapHome, card); }
+  $("tm-body").appendChild(card);
+  $("tm").hidden = false; document.body.classList.add("noscroll");
+  renderTmHead(); renderTmQb(); $("tm-status").hidden = true;
+  if (!opts.quick) setTimeout(() => $("amt").focus({ preventScroll: true }), 60);
+  if (window.gsap && !REDUCED) gsap.fromTo(".tm-card", { y: 30, opacity: .001 }, { y: 0, opacity: 1, duration: .35, ease: "power3.out" });
+  ready.then(() => renderTmHead());
+  return ready;
+}
+function closeTrade() {
+  if ($("tm").hidden) return;
+  $("tm").hidden = true; document.body.classList.remove("noscroll"); qbRun = null;
+  if (swapHome) swapHome.parentNode.insertBefore($("c-swap"), swapHome.nextSibling);
+}
+function renderTmHead() {
+  const sel = S.sel; if (!sel) return; const { base, pool } = sel, t = S.tokens[lc(base.id)] || {};
+  const L = pool.curve, pct = L ? Math.min(100, (L.progress || 0) * 100) : null;
+  $("tm-head").innerHTML = `<div class="tm-tok">${avHTML(base.symbol, base.id)}<div style="min-width:0"><div class="tm-sym">${esc(base.symbol)} <span class="muted">/ ${esc(sel.quote.symbol || "")}</span></div>
+    <div class="tm-sub"><span class="ellip">${esc(base.name || "")}</span>${linksHTML(base.id)}</div></div></div>
+    <div class="tm-stats"><div><b>${t.price > 0 ? fmtPrice(t.price) : "—"}</b><span>Price</span></div><div><b>${isFinite(t.change) ? chipHTML(t.change) : "—"}</b><span>24h</span></div>${t.fdv > 0 ? `<div><b>${fmtUsd(t.fdv)}</b><span>Mkt cap</span></div>` : ""}</div>
+    ${pct != null ? `<div class="tm-grad"><span class="gm${pct >= 80 ? " hot" : ""}"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct.toFixed(1)}%</span></span><small>to graduation</small></div>` : ""}`;
+}
+function renderTmQb() { if ($("tm").hidden) return; $("tm-qb").innerHTML = `${BOLT} Buy ${esc(S.qb)} ETH`; }
+$("tm-x").onclick = closeTrade;
+$("tm").addEventListener("click", (e) => { if (e.target === $("tm")) closeTrade(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("tm").hidden && $("wm").hidden) closeTrade(); });
+$("tm-qb").onclick = () => quickBuy(S.sel?.pool);
+$("tm-qbset").onclick = (e) => { e.stopPropagation(); openQbPop($("tm-qbset")); };
+$("tm-chart").onclick = () => { closeTrade(); $("c-chart").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); };
+
+// ======================= ONE-CLICK BUY =======================
+// Fills the trade window with the saved amount and presses Buy as soon as the route and quote are ready.
+// The wallet still shows the exact amounts and asks to confirm: nothing is signed without the user.
+let qbRun = null;
+async function quickBuy(pool) {
+  if (!pool) return;
+  if (!S.wallet) { openTrade(pool); tmStatus("Connect a wallet first, then press the bolt again.", ""); openWalletPicker(); return; }
+  const run = qbRun = {};
+  await openTrade(pool, { quick: true });
+  if (qbRun !== run) return;
+  if (S.side !== "buy") setSide("buy");
+  $("amt").value = S.qb; requestQuote();
+  tmStatus(`${BOLT} Quick buy ${esc(S.qb)} ETH · checking route and price…`, "busy");
+  const t0 = Date.now();
+  while (qbRun === run && Date.now() - t0 < 15000) {
+    const go = $("go"), a = go.dataset.action;
+    if (a === "swap" && !go.disabled) { tmStatus(`${BOLT} Quick buy ${esc(S.qb)} ETH · confirm in your wallet`, "busy"); go.click(); watchQuick(run); return; }
+    if (/not supported|closed|Cannot process|Insufficient/i.test(go.textContent)) { tmStatus(esc(go.textContent) + ".", "err"); return; }
+    await new Promise(r => setTimeout(r, 150));
+  }
+  if (qbRun === run) tmStatus("The quote took too long. Press Buy to try again.", "err");
+}
+function watchQuick(run) {               // mirror the swap card's message into the window status
+  const msg = $("msg"); let last = "";
+  const iv = setInterval(() => { if (qbRun !== run || $("tm").hidden) return clearInterval(iv);
+    const txt = msg && !msg.hidden ? msg.textContent : ""; if (txt && txt !== last) { last = txt; tmStatus(esc(txt), msg.classList.contains("err") ? "err" : msg.classList.contains("ok") ? "ok" : "busy"); }
+    if (msg?.classList.contains("ok") || msg?.classList.contains("err")) clearInterval(iv); }, 300);
+}
+function tmStatus(html, kind) { const el = $("tm-status"); el.hidden = false; el.className = "tm-status " + (kind || ""); el.innerHTML = html; }
+
+// ======================= MENU (narrow screens) =======================
+const SECTIONS = [["c-pulse", "Market overview"], ["c-chart", "Chart"], ["c-swap", "Trade"], ["c-table", "Tokens · Pons curve"], ["c-trend", "Trending"], ["c-trades", "Buy / sell activity"], ["c-wallet", "Wallet"], ["c-watch", "Watchlist"], ["c-rev", "TradePad fees"]];
+function openDrawer() {
+  $("dr-sec").innerHTML = SECTIONS.map(([id, n]) => `<button data-go="${id}">${n}<span>›</span></button>`).join("");
+  $("dr-road").innerHTML = PHASES.map(p => `<button data-ph="${p.n}" data-s="${phState(p.n)}"><i>${String(p.n).padStart(2, "0")}</i>${p.name}<em>${phState(p.n) === "live" ? "LIVE" : phState(p.n) === "next" ? "NEXT" : "SOON"}</em></button>`).join("");
+  $("dr-qb").innerHTML = `${BOLT} Quick buy <b>${esc(S.qb)} ETH</b>`;
+  $("dr-sec").querySelectorAll("button").forEach(b => b.onclick = () => { closeDrawer(); const el = $(b.dataset.go); (el.closest(".tm") ? (closeTrade(), $(b.dataset.go)) : el).scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); });
+  $("dr-road").querySelectorAll("button").forEach(b => b.onclick = () => { closeDrawer(); const n = Number(b.dataset.ph); if (n === 1) window.scrollTo({ top: 0, behavior: "smooth" }); else openPhase(n); });
+  $("drawer").hidden = false; $("menu-btn").setAttribute("aria-expanded", "true"); document.body.classList.add("noscroll");
+}
+function closeDrawer() { $("drawer").hidden = true; $("menu-btn").setAttribute("aria-expanded", "false"); if ($("tm").hidden) document.body.classList.remove("noscroll"); }
+$("menu-btn").onclick = () => $("drawer").hidden ? openDrawer() : closeDrawer();
+$("drawer").addEventListener("click", (e) => { if (e.target === $("drawer")) closeDrawer(); });
+$("dr-x").onclick = closeDrawer;
+$("dr-qb").onclick = (e) => { e.stopPropagation(); openQbPop($("dr-qb")); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("drawer").hidden) closeDrawer(); });
 $("rm-x").onclick = closePhase;
 $("rm").addEventListener("click", (e) => { if (e.target === $("rm")) closePhase(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("rm").hidden) closePhase(); });
