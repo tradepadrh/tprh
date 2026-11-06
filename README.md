@@ -63,6 +63,15 @@ Only Robinhood Chain endpoints used by the DEX are forwarded.
 Static hosts (Netlify drop, Cloudflare Pages upload) have no server, so the page falls back to
 sample data there. Use Railway (or any Node host) for live data.
 
+## Chain reads and token images
+- `POST /rpc` relays read-only JSON-RPC calls (`eth_call`, `eth_getLogs`, ...) to the public Robinhood Chain RPC, so the
+  Pons lists and on-chain charts work even on networks that block the public RPC. Sending transactions is refused;
+  wallets talk to their own RPC.
+- `/img/ipfs/<cid>` serves Pons token logos (`logo()` on the token contract, an `ipfs://` link) from public IPFS
+  gateways, cached in memory. DexPaprika tokens use DexPaprika's own image CDN.
+- Graduated Pons tokens and new Uniswap v4 pools get charts built on-chain: the bonding-curve trades before
+  graduation plus the pool's Swap events after it.
+
 ## 3. Deploy the router contract (from your own computer, not Railway)
 The router supports:
 - **Pons v1 launches** (most live Pons tokens): Uniswap V3 pool against WETH, 1% fee tier.

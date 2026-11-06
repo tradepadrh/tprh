@@ -191,7 +191,9 @@ a { color: inherit; }
 .btn-s:hover { background: var(--volt); color: var(--volt-fg); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
 .btn svg { width: 16px; height: 16px; }
-.av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 11px; color: #fff; flex: none; letter-spacing: -.02em; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); }
+.av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 11px; color: #fff; flex: none; letter-spacing: -.02em; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); position: relative; overflow: hidden; }
+.av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; opacity: 0; transition: opacity .25s; }
+.av img.ok { opacity: 1; background: #1b1814; }
 .ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skel { background: linear-gradient(90deg, var(--soft), var(--glass-hi), var(--soft)); background-size: 200% 100%; animation: sh 1.4s infinite linear; border-radius: 6px; color: transparent !important; }
 @keyframes sh { to { background-position: -200% 0; } }
@@ -723,7 +725,42 @@ const fmtPct = (v) => { v = Number(v); return isFinite(v) ? Math.abs(v).toFixed(
 const short = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
 function ago(t) { const d = (Date.now() - new Date(t).getTime()) / 1000; if (!isFinite(d)) return "—"; if (d < 60) return Math.max(1, d | 0) + "s ago"; if (d < 3600) return (d / 60 | 0) + "m ago"; if (d < 86400) return (d / 3600 | 0) + "h ago"; return (d / 86400 | 0) + "d ago"; }
 function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
-function avHTML(sym, id, cls = "av") { const t = (sym || "?").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase() || "?"; return `<span class="${cls}" style="background:hsl(${hue(id || sym)} 62% 52%)">${esc(t)}</span>`; }
+// ---- token images: DexPaprika's static images, and Pons logo() links (ipfs:// through the server's image relay)
+const IMG = {}; const LOGO_TRIED = new Set();
+const ipfsUrl = (cid) => CONFIG.IMG_PROXY ? CONFIG.IMG_PROXY + cid : "https://gateway.pinata.cloud/ipfs/" + cid;
+// an image that fails once is dropped for the session, so the letter avatar stays
+window.tpImgFail = (el) => { const k = el.parentElement?.dataset.tok; if (k) delete IMG[k]; el.remove(); };
+function setLogo(id, uri) {
+  id = lc(id); LOGO_TRIED.add(id); if (!uri || typeof uri !== "string") return;
+  uri = uri.trim(); let url = null;
+  const m = uri.match(/^ipfs:\/\/(?:ipfs\/)?([A-Za-z0-9]{46,100}(?:\/[\w.\-]{1,80})?)$/);
+  if (m) url = ipfsUrl(m[1]);
+  else if (/^https:\/\/[^\s"'<>]+$/.test(uri)) url = uri.replace(/^https:\/\/(?:ipfs\.io|cloudflare-ipfs\.com|gateway\.pinata\.cloud)\/ipfs\/([A-Za-z0-9]{46,100})$/, (_, c) => ipfsUrl(c));
+  else if (/^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(uri) && uri.length < 200000) url = uri;
+  if (url && !IMG[id]) { IMG[id] = url; paintAvatars(); }
+}
+function avHTML(sym, id, cls = "av") {
+  const t = (sym || "?").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase() || "?", key = lc(id || "");
+  const img = IMG[key] ? `<img src="${esc(IMG[key])}" alt="" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('ok')" onerror="tpImgFail(this)">` : "";
+  return `<span class="${cls}" data-tok="${esc(key)}" style="background:hsl(${hue(id || sym)} 62% 52%)">${esc(t)}${img}</span>`;
+}
+// fill in images for avatars already on screen once their logo is known
+let paintQueued = false;
+function paintAvatars() {
+  if (paintQueued) return; paintQueued = true;
+  requestAnimationFrame(() => { paintQueued = false;
+    document.querySelectorAll("[data-tok]").forEach(el => { const u = IMG[el.dataset.tok]; if (!u || el.querySelector("img")) return;
+      const im = new Image(); im.alt = ""; im.decoding = "async"; im.referrerPolicy = "no-referrer"; im.onload = () => im.classList.add("ok"); im.onerror = () => tpImgFail(im); im.src = u; el.appendChild(im); }); });
+}
+new MutationObserver(() => paintAvatars()).observe(document.body, { childList: true, subtree: true });
+// Pons tokens on screen without an image: ask their contract for logo() in one multicall
+let logoTimer = null;
+function queueLogos() { clearTimeout(logoTimer); logoTimer = setTimeout(async () => {
+  const ids = [...new Set([...document.querySelectorAll("[data-tok]")].map(e => e.dataset.tok))].filter(id => /^0x[0-9a-f]{40}$/.test(id) && !IMG[id] && !LOGO_TRIED.has(id) && !QUOTES.has(id)).slice(0, 120);
+  if (!ids.length) return; ids.forEach(id => LOGO_TRIED.add(id));
+  try { const r = await multicall(ids.map(id => [id, IER(), "logo"])); ids.forEach((id, i) => setLogo(id, r[i])); } catch {}
+}, 700); }
+new MutationObserver(() => queueLogos()).observe(document.body, { childList: true, subtree: true });
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 const pick = (o, ...paths) => { for (const p of paths) { const v = p.split(".").reduce((x, k) => x?.[k], o); if (v !== undefined && v !== null) return v; } return undefined; };
 const chipHTML = (v) => isFinite(v) ? `<span class="chip ${v >= 0 ? "up" : "down"}">${fmtPct(v)}</span>` : `<span class="muted">—</span>`;
@@ -778,6 +815,7 @@ function ingestToken(tk, t, raw, isBase, p) {
 }
 function normalizePool(raw) {
   const tokens = (raw.tokens || []).map(t => ({ id: lc(t.id), symbol: t.symbol || "?", name: t.name || "", decimals: t.decimals }));
+  (raw.tokens || []).forEach(t => { const id = lc(t.id); if (t.has_image && /^0x[0-9a-f]{40}$/.test(id) && !IMG[id]) { IMG[id] = `https://static.dexpaprika.com/dexpaprika-static/${NET()}/${id}.webp`; LOGO_TRIED.add(id); } });
   const p = {
     id: raw.id, dex_id: raw.dex_id || "", dex_name: raw.dex_name || "", created_at: raw.created_at,
     volume_usd: Number(raw.volume_usd_24h ?? raw.volume_usd), transactions: Number(raw.transactions_24h ?? raw.transactions),
@@ -902,7 +940,7 @@ const THEAD = {
 function updateCounts() {
   const live = PONS.launches.filter(l => l.phase === 0).length;
   if (PONS.ready) $("n-curve").textContent = live + " on curve now";
-  else if (PONS.error) $("n-curve").textContent = "chain unreachable";
+  else if (PONS.error) { $("n-curve").textContent = "chain unreachable · retrying"; $("n-curve").title = String(PONS.error?.shortMessage || PONS.error?.message || PONS.error).slice(0, 200); }
   const g = PONS.grad.size + PONS.v1.size;
   if (PONS.gradReady) $("n-grad").textContent = g.toLocaleString("en-US") + " graduated";
   const uni = S.pools.filter(p => !isPonsToken(splitPool(p).base.id)).length;
@@ -990,10 +1028,12 @@ const T_GRAD = "0xcdb72f157fd3666758a6ce201387ffb52038c7562e4fff352828da1096c4b6
 const PONS = { byId: {}, launches: [], lastBlock: 0, grad: new Set(), gradBlock: {}, gradTo: 0, v1: new Set(), v1Checked: new Set(),
   ready: false, gradReady: false, error: null, loading: null, at: 0, head: null, gradFetched: new Set(), pairs: {} };
 let rpcP = null;
-const rpc = () => rpcP || (rpcP = new ethers.JsonRpcProvider(CONFIG.RPC, CONFIG.CHAIN_ID, { staticNetwork: true }));
+// reads go through the server relay (/rpc) when the page is served by server.js: works even where the public RPC is blocked
+const READ_RPC = () => CONFIG.RPC_PROXY ? location.origin + CONFIG.RPC_PROXY : CONFIG.RPC;
+const rpc = () => rpcP || (rpcP = new ethers.JsonRpcProvider(READ_RPC(), CONFIG.CHAIN_ID, { staticNetwork: true, batchMaxCount: 20 }));
 const IFC = () => (IFC.f ||= new ethers.Interface(ABI.factory));
 const ICV = () => (ICV.c ||= new ethers.Interface(ABI.curve));
-const IER = () => (IER.e ||= new ethers.Interface([...ABI.erc20, "function name() view returns (string)", "function totalSupply() view returns (uint256)"]));
+const IER = () => (IER.e ||= new ethers.Interface([...ABI.erc20, "function name() view returns (string)", "function totalSupply() view returns (uint256)", "function logo() view returns (string)"]));
 const IV1 = () => (IV1.v ||= new ethers.Interface(ABI.ponsV1Token));
 const IMC = () => (IMC.m ||= new ethers.Interface(["function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[])"]));
 // calls: [[target, iface, fn, args]] -> decoded value per call (null when it reverted)
@@ -1074,12 +1114,12 @@ async function readLaunchState(list) {
   const calls = [];
   for (const L of list) {
     calls.push([CONFIG.PONS_FACTORY, IFC(), "getLaunchedToken", [L.id]]);
-    if (L.symbol == null) calls.push([L.id, IER(), "symbol"], [L.id, IER(), "name"], [L.id, IER(), "totalSupply"], [L.id, IER(), "decimals"]);
+    if (L.symbol == null) calls.push([L.id, IER(), "symbol"], [L.id, IER(), "name"], [L.id, IER(), "totalSupply"], [L.id, IER(), "decimals"], [L.id, IER(), "logo"]);
   }
   const r = await multicall(calls); let k = 0;
   for (const L of list) {
     const g = r[k++];
-    if (L.symbol == null) { L.symbol = String(r[k++] ?? "?"); L.name = String(r[k++] ?? ""); L.supplyRaw = r[k++]; L.dec = Number(r[k++] ?? 18); }
+    if (L.symbol == null) { L.symbol = String(r[k++] ?? "?"); L.name = String(r[k++] ?? ""); L.supplyRaw = r[k++]; L.dec = Number(r[k++] ?? 18); setLogo(L.id, r[k++]); }
     if (g && g.exists) { L.phase = Number(g.phase); L.curve = g.curve; L.pair = lc(g.pairToken); if (L.phase === 2) { PONS.grad.add(L.id); PONS.gradBlock[L.id] ||= L.block; } }
     else L.phase = -1;
   }
@@ -1207,7 +1247,9 @@ async function selectPool(pool) {
   if (!pool) return;
   const { base, quote, baseIndex } = splitPool(pool);
   S.sel = { pool, base, quote, baseIndex }; S.pons = null;
+  pool.chainChart = !pool.curve && PONS.grad.has(lc(base.id));       // graduated Pons: full on-chain history (curve + pool)
   if (pool.curve) { const age = (Date.now() - new Date(blockTime(pool.curve.block)).getTime()) / 1000; S.interval = age < 4 * 3600 ? "1m" : age < 24 * 3600 ? "5m" : age < 4 * 86400 ? "15m" : "1h"; }
+  else if (pool.chainChart) S.interval = "15m";
   else if (INTERVALS[S.interval]?.curveOnly || (INTERVALS[S.interval]?.key && !hasKey())) S.interval = "1h";
   setupIntervals();
   $("t-av").outerHTML = avHTML(base.symbol, base.id).replace('class="av"', 'class="av" id="t-av"');
@@ -1285,7 +1327,68 @@ function curveStats(L, trades, usd) {
   }
   if (S.sel?.pool.curve === L) { showTokenStats(t); renderActivity(); }
 }
-setInterval(() => { if (S.sel?.pool.curve && !document.hidden) loadChart(true); }, 12000);
+setInterval(() => { if ((S.sel?.pool.curve || S.sel?.pool.chainChart) && !document.hidden) loadChart(true); }, 12000);
+
+// ---- on-chain history for graduated Pons tokens and new Uniswap v4 pools:
+// the bonding-curve trades before graduation plus the pool's Swap events after it
+const POOL_MANAGER = "0x8366a39CC670B4001A1121B8F6A443A643e40951";
+const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f";   // Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)
+const CHAIN_TR = {};
+const word = (data, i) => data.slice(2 + i * 64, 2 + (i + 1) * 64);
+function chainTrades(pool, base, quote) {
+  const c = CHAIN_TR[pool.id] || (CHAIN_TR[pool.id] = { to: 0, curveDone: false, trades: [], loading: null });
+  if (c.loading) return c.loading;
+  return c.loading = (async () => {
+    try {
+      const latest = await rpc().getBlockNumber(), id = lc(base.id);
+      const qDec = Number(quote.decimals ?? (quote.id === ZERO || quote.id === WETH ? 18 : 18)), bDec = Number(base.decimals ?? 18);
+      if (!c.curveDone) {
+        c.curveDone = true;
+        const gb = PONS.gradBlock[id];
+        if (PONS.grad.has(id)) {
+          const g = await new ethers.Contract(CONFIG.PONS_FACTORY, ABI.factory, rpc()).getLaunchedToken(base.id).catch(() => null);
+          if (g && g.exists) {
+            const end = gb || latest, start = Math.max(PONS_START, end - 3_000_000);
+            const logs = (await Promise.all([CURVE_BUY, CURVE_SELL].map(t => addrLogs(g.curve, [t], start, end, 2_000_000)))).flat();
+            for (const l of logs) {
+              const w = (l.data.slice(2).match(/.{64}/g) || []).map(x => BigInt("0x" + x)); if (w.length < 3) continue;
+              const buy = l.topics[0] === CURVE_BUY, extra = w[3] || 0n, net = buy ? w[0] - w[2] - extra : w[1] + w[2] + extra, tok = buy ? w[1] : w[0];
+              const qf = Number(ethers.formatUnits(net > 0n ? net : 0n, qDec)), tf = Number(ethers.formatUnits(tok, bDec));
+              if (qf > 0 && tf > 0) c.trades.push({ block: l.blockNumber, idx: l.index, buy, price: qf / tf, q: Number(ethers.formatUnits(buy ? w[0] : w[1], qDec)) });
+            }
+          }
+          c.to = Math.max(c.to, (gb || latest - 3_000_000) - 1);
+        } else c.to = latest - 3_000_000;
+      }
+      if (/^0x[0-9a-f]{64}$/i.test(pool.id) && latest > c.to) {
+        const logs = await addrLogs(POOL_MANAGER, [V4_SWAP, pool.id.toLowerCase()], c.to + 1, latest, 2_000_000);
+        const baseIs0 = lc(base.id) < lc(quote.id); let prev = c.trades.length ? c.trades[c.trades.length - 1].price : 0;
+        for (const l of logs) {
+          const a0 = BigInt.asIntN(256, BigInt("0x" + word(l.data, 0))), a1 = BigInt.asIntN(256, BigInt("0x" + word(l.data, 1)));
+          const r = Number(BigInt("0x" + word(l.data, 2))) / 2 ** 96, p10 = r * r;
+          const dec0 = baseIs0 ? bDec : qDec, dec1 = baseIs0 ? qDec : bDec, p1per0 = p10 * 10 ** (dec0 - dec1);
+          const price = baseIs0 ? p1per0 : 1 / p1per0; if (!(price > 0) || !isFinite(price)) continue;
+          const qa = baseIs0 ? a1 : a0, q = Math.abs(Number(qa)) / 10 ** qDec;
+          c.trades.push({ block: l.blockNumber, idx: l.index, buy: price >= prev, price, q }); prev = price;
+        }
+        c.to = latest;
+      }
+      c.trades.sort((a, b) => a.block - b.block || a.idx - b.idx);
+      return c.trades;
+    } finally { c.loading = null; }
+  })();
+}
+async function chainChart(pool, base, silent) {
+  const note = $("chart-note"), quote = S.sel.quote; let trades;
+  try { if (!PONS.head) await loadPons(); trades = await chainTrades(pool, base, quote); }
+  catch { if (S.sel?.pool.id === pool.id && !silent) { candle.setData([]); vol.setData([]); note.hidden = false; note.textContent = "Could not read this pool's trades from Robinhood Chain. Retrying…"; } return; }
+  if (S.sel?.pool.id !== pool.id) return;
+  const usd = quoteUsd(lc(quote.id)) || 1;
+  const bars = curveCandles(trades, IV_SEC[S.interval] || 900, usd);
+  lastBars = bars; candle.setData(bars.map(({ volume, ...b }) => b)); vol.setData(volData(bars));
+  if (!silent) chart.timeScale().fitContent();
+  if (bars.length) note.hidden = true; else { note.hidden = false; note.textContent = "No trades found on-chain for this pool yet."; }
+}
 
 // ======================= CHART =======================
 let chart, candle, vol;
@@ -1319,7 +1422,7 @@ const hasKey = () => CONFIG.HAS_KEY && !S.keyBroken;                 // keyBroke
 function intervalCfg(iv) { const c = INTERVALS[iv]; return hasKey() ? c : { ...c, s: Math.min(c.s, 23 * 3600), limit: Math.min(c.limit, 24) }; }
 function setupIntervals() {
   $("intervals").querySelectorAll("button").forEach(b => {
-    const curve = !!S.sel?.pool.curve, cfg = INTERVALS[b.dataset.i];
+    const curve = !!(S.sel?.pool.curve || S.sel?.pool.chainChart), cfg = INTERVALS[b.dataset.i];
     b.hidden = !!cfg.curveOnly && !curve;
     const locked = !curve && cfg.key && !hasKey();           // curve candles come from the chain: every interval works
     b.disabled = locked; b.style.opacity = locked ? .4 : ""; b.style.cursor = locked ? "not-allowed" : "";
@@ -1347,6 +1450,7 @@ async function loadChart(silent) {
     if (bars.length) note.hidden = true; else { note.hidden = false; note.textContent = "No trades on this curve yet. Be the first."; }
     return;
   }
+  if (pool.chainChart) return chainChart(pool, base, silent);
   let rows = [], err = null;
   if (S.sample) rows = sampleCandles(pool.id, cfg.limit, S.interval);
   else {
@@ -1367,6 +1471,7 @@ async function loadChart(silent) {
   lastBars = bars;
   candle.setData(bars.map(({ volume, ...b }) => b)); vol.setData(volData(bars)); chart.timeScale().fitContent();
   if (bars.length) { note.hidden = true; return; }
+  if (/^0x[0-9a-f]{64}$/i.test(pool.id) && !S.sample) { pool.chainChart = true; setupIntervals(); return chainChart(pool, base, silent); }   // new v4 pool: read its swaps
   note.textContent = err && err.status === 403 ? "This chart range needs a free DexPaprika API key." : err && err.status === 429 ? "Chart data is rate limited. Try again in a minute." : "No price data for this range yet.";
 }
 
@@ -1448,7 +1553,7 @@ async function wagmi() {
     if (CONFIG.WC_PROJECT_ID) connectors.push(C.walletConnect({ projectId: CONFIG.WC_PROJECT_ID, showQrModal: true,
       metadata: { name: "TradePad", description: "The Pons-native DEX on Robinhood Chain", url: location.origin, icons: [location.origin + "/tp-mark.svg"] },
       qrModalOptions: { themeMode: "dark", themeVariables: { "--wcm-accent-color": "#CCFF04", "--wcm-accent-fill-color": "#141A00", "--wcm-background-color": "#1F1B16" } } }));
-    const cfg = W.createConfig({ chains: [chain], connectors, multiInjectedProviderDiscovery: true, transports: { [chain.id]: W.http(CONFIG.RPC) }, ssr: false });
+    const cfg = W.createConfig({ chains: [chain], connectors, multiInjectedProviderDiscovery: true, transports: { [chain.id]: W.http(READ_RPC()) }, ssr: false });
     return { W, cfg };
   })().catch(e => { WG = null; throw e; });
 }

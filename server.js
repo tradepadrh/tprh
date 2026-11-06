@@ -21,7 +21,7 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // ---------------------------------------------------------------- config.js
 function buildConfig() {
-  const cfg = { API: "/dp", HAS_KEY: Boolean(API_KEY) };
+  const cfg = { API: "/dp", HAS_KEY: Boolean(API_KEY), RPC_PROXY: "/rpc", IMG_PROXY: "/img/ipfs/" };
   const router = (process.env.ROUTER_ADDRESS || "").trim();
   if (router) {
     if (ADDRESS_RE.test(router)) cfg.ROUTER = router;
@@ -158,9 +158,84 @@ function proxy(req, res, apiPath, search) {
   });
 }
 
+// ---------------------------------------------------------------- chain RPC relay
+// The page reads Pons launches through /rpc, so visitors whose network blocks the public RPC still get data.
+// Read-only methods only; nothing that can send a transaction.
+const RPC_UPSTREAM = /^https?:\/\//.test(process.env.RPC_UPSTREAM || "") ? process.env.RPC_UPSTREAM.trim()      // local testing only
+  : /^https:\/\//.test(process.env.PUBLIC_RPC_URL || "") ? process.env.PUBLIC_RPC_URL.trim() : "https://rpc.mainnet.chain.robinhood.com";
+const RPC_METHODS = new Set(["eth_chainId", "net_version", "eth_blockNumber", "eth_getBlockByNumber", "eth_getLogs", "eth_call", "eth_getCode", "eth_getBalance"]);
+const rpcCache = new Map(), rpcInflight = new Map();
+function rpcUpstream(body) {
+  return new Promise((resolve) => {
+    const u = new URL(RPC_UPSTREAM);
+    const req = (u.protocol === "http:" ? http : https).request({ hostname: u.hostname, port: u.port || (u.protocol === "http:" ? 80 : 443), path: u.pathname + u.search, method: "POST", timeout: 20000,
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body), "User-Agent": "tradepad-rpc" } }, (up) => {
+      const chunks = []; let size = 0;
+      up.on("data", (c) => { size += c.length; if (size > 25e6) up.destroy(); else chunks.push(c); });
+      up.on("end", () => resolve({ status: up.statusCode || 502, body: Buffer.concat(chunks) }));
+      up.on("error", () => resolve({ status: 502, body: Buffer.from('{"error":"upstream"}') }));
+    });
+    req.on("timeout", () => req.destroy());
+    req.on("error", () => resolve({ status: 502, body: Buffer.from('{"error":"upstream unreachable"}') }));
+    req.end(body);
+  });
+}
+function rpcRelay(req, res) {
+  const chunks = []; let size = 0;
+  req.on("data", (c) => { size += c.length; if (size > 256 * 1024) req.destroy(); else chunks.push(c); });
+  req.on("end", async () => {
+    const body = Buffer.concat(chunks).toString("utf8"); let msg;
+    try { msg = JSON.parse(body); } catch { return json(res, 400, { error: "bad json" }); }
+    const calls = Array.isArray(msg) ? msg : [msg];
+    if (!calls.length || calls.length > 50 || calls.some(c => !c || !RPC_METHODS.has(c.method))) return json(res, 403, { error: "method not allowed" });
+    const now = Date.now(), hit = rpcCache.get(body);
+    if (hit && hit.exp > now) return send(res, hit.status, hit.body, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    let p = rpcInflight.get(body);
+    if (!p) { p = rpcUpstream(body).finally(() => rpcInflight.delete(body)); rpcInflight.set(body, p); }
+    const r = await p;
+    if (r.status === 200) { rpcCache.set(body, { ...r, exp: now + 2000 }); if (rpcCache.size > 300) rpcCache.delete(rpcCache.keys().next().value); }
+    send(res, r.status, r.body, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  });
+}
+
+// ---------------------------------------------------------------- IPFS images (Pons token logos)
+// Token logos are ipfs:// links. The server fetches them once from public gateways and keeps them in memory.
+const IPFS_GATEWAYS = ["https://gateway.pinata.cloud/ipfs/", "https://ipfs.io/ipfs/", "https://dweb.link/ipfs/"];
+const CID_RE = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{50,100})(\/[\w.\-]{1,80})?$/;
+const imgCache = new Map(); let imgBytes = 0; const imgInflight = new Map();
+function getOnce(url, max) {
+  return new Promise((resolve) => {
+    const req = https.get(url, { timeout: 15000, headers: { "User-Agent": "tradepad-img" } }, (up) => {
+      if (up.statusCode >= 300 && up.statusCode < 400 && up.headers.location) { up.resume(); return resolve(getOnce(new URL(up.headers.location, url).href, max)); }
+      const type = String(up.headers["content-type"] || "");
+      if (up.statusCode !== 200 || !/^image\/(png|jpe?g|gif|webp|avif|svg\+xml)/.test(type)) { up.resume(); return resolve(null); }
+      const chunks = []; let size = 0;
+      up.on("data", (c) => { size += c.length; if (size > max) up.destroy(); else chunks.push(c); });
+      up.on("end", () => resolve(size <= max ? { type, body: Buffer.concat(chunks) } : null));
+      up.on("error", () => resolve(null));
+    });
+    req.on("timeout", () => req.destroy()); req.on("error", () => resolve(null));
+  });
+}
+async function ipfsImage(req, res, cid) {
+  if (!CID_RE.test(cid)) return send(res, 400, "bad cid");
+  let hit = imgCache.get(cid);
+  if (!hit) {
+    let p = imgInflight.get(cid);
+    if (!p) { p = (async () => { for (const g of IPFS_GATEWAYS) { const r = await getOnce(g + cid, 4e6); if (r) return r; } return null; })().finally(() => imgInflight.delete(cid)); imgInflight.set(cid, p); }
+    hit = await p;
+    if (!hit) return send(res, 404, "not found", { "Cache-Control": "public, max-age=300" });
+    imgCache.set(cid, hit); imgBytes += hit.body.length;
+    while (imgBytes > 80e6) { const [k, v] = imgCache.entries().next().value; imgCache.delete(k); imgBytes -= v.body.length; }
+  }
+  // SVGs are served as files the page only shows in <img>, with a strict sandbox
+  send(res, 200, hit.body, { "Content-Type": hit.type, "Cache-Control": "public, max-age=31536000, immutable", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+}
+
 // ---------------------------------------------------------------- server
 const server = http.createServer((req, res) => {
-  if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method Not Allowed", { Allow: "GET, HEAD" });
+  if (req.method === "POST" && req.url === "/rpc") return rpcRelay(req, res);
+  if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method Not Allowed", { Allow: "GET, HEAD, POST" });
 
   let url;
   try { url = new URL(req.url, "http://x"); } catch { return send(res, 400, "Bad Request"); }
@@ -170,6 +245,7 @@ const server = http.createServer((req, res) => {
   if (urlPath === "/healthz") return send(res, 200, "ok", { "Content-Type": "text/plain" });
   if (urlPath === "/config.js") return send(res, 200, CONFIG_JS, { "Content-Type": TYPES[".js"], "Cache-Control": "no-cache" });
   if (url.pathname.startsWith("/dp/")) return proxy(req, res, url.pathname.slice(3), url.search);
+  if (url.pathname.startsWith("/img/ipfs/")) return ipfsImage(req, res, url.pathname.slice(10));
 
   if (urlPath.endsWith("/")) urlPath += "index.html";
   const file = path.normalize(path.join(ROOT, urlPath));
