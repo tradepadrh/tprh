@@ -192,6 +192,13 @@ a { color: inherit; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
 .btn svg { width: 16px; height: 16px; }
 .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 11px; color: #fff; flex: none; letter-spacing: -.02em; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); position: relative; overflow: hidden; }
+/* token links: Pons page, X, website, Telegram */
+.links { display: inline-flex; gap: 5px; align-items: center; margin-left: 6px; vertical-align: middle; }
+.lk { width: 22px; height: 22px; border-radius: 7px; text-decoration: none; display: inline-grid; place-items: center; background: var(--soft); border: 1px solid var(--line); color: var(--muted); transition: color .15s, border-color .15s, background .15s; flex: none; }
+.lk:hover { color: var(--volt); border-color: rgba(204, 255, 4, .5); background: rgba(204, 255, 4, .08); }
+.lk svg { width: 12px; height: 12px; }
+.lk.pons { width: auto; padding: 0 7px; font-size: 10px; font-weight: 800; letter-spacing: .04em; color: var(--volt); border-color: rgba(204, 255, 4, .35); }
+.asset .links { margin-left: 4px; }
 .av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; opacity: 0; transition: opacity .25s; }
 .av img.ok { opacity: 1; background: #1b1814; }
 .ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -468,7 +475,7 @@ th.r, td.r { text-align: right; }
               <div class="av" id="t-av">—</div>
               <div style="min-width:0">
                 <div class="tok-n ellip" id="t-sym"><span class="skel">MEMUAT</span></div>
-                <div class="tok-s"><span class="ellip" id="t-name" style="max-width:160px"></span><a id="t-addr" target="_blank" rel="noopener"></a><button class="copy" id="cp">Copy</button></div>
+                <div class="tok-s"><span class="ellip" id="t-name" style="max-width:160px"></span><a id="t-addr" target="_blank" rel="noopener"></a><button class="copy" id="cp">Copy</button><span class="links" id="t-links"></span></div>
               </div>
             </div>
             <div class="hstat"><b id="t-price">—</b><span>Price</span></div>
@@ -728,6 +735,44 @@ function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCode
 // ---- token images: DexPaprika's static images, and Pons logo() links (ipfs:// through the server's image relay)
 const IMG = {}; const LOGO_TRIED = new Set();
 const ipfsUrl = (cid) => CONFIG.IMG_PROXY ? CONFIG.IMG_PROXY + cid : "https://gateway.pinata.cloud/ipfs/" + cid;
+// ---- token links. socials() on Pons tokens: twitter, telegram, discord, website, farcaster
+const SOC = {};
+function cleanUrl(u, kind) {
+  u = String(u || "").trim(); if (!u || u.length > 200 || /[\s"'<>]/.test(u)) return null;
+  if (kind === "x" && /^@?[A-Za-z0-9_]{1,15}$/.test(u)) return "https://x.com/" + u.replace(/^@/, "");
+  if (kind === "tg" && /^@?[A-Za-z0-9_]{4,32}$/.test(u)) return "https://t.me/" + u.replace(/^@/, "");
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  try { const x = new URL(u); return x.protocol === "https:" || x.protocol === "http:" ? x.href : null; } catch { return null; }
+}
+function setSocials(id, r) {
+  id = lc(id); if (!r) { SOC[id] ||= {}; return; }
+  const [x, tg, dc, web] = [r[0], r[1], r[2], r[3]];
+  SOC[id] = { x: cleanUrl(x, "x"), tg: cleanUrl(tg, "tg"), dc: cleanUrl(dc), web: cleanUrl(web) };
+}
+const ICO = {
+  x: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z"/></svg>',
+  web: '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></g></svg>',
+  tg: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M21.5 4.1L2.9 11.3c-1.3.5-1.2 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.4.8.9.8.4 0 .6-.2.9-.4l2.4-2.3 4.9 3.6c.9.5 1.5.2 1.8-.8l3.2-15.1c.3-1.3-.5-1.9-1.9-1.6zM9.6 14.1l8.4-5.3c.4-.2.7-.1.4.2l-7.2 6.5-.3 3.1-1.3-4.5z"/></svg>',
+  dc: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 5.3A16 16 0 0015.4 4l-.5 1a14.6 14.6 0 00-5.8 0l-.5-1a16 16 0 00-3.9 1.3C2.2 9 1.6 12.6 1.9 16.2a16 16 0 004.8 2.4l1-1.6c-.6-.2-1.1-.5-1.6-.8l.4-.3a11.4 11.4 0 0010.9 0l.4.3c-.5.3-1 .6-1.6.8l1 1.6a16 16 0 004.8-2.4c.4-4.2-.6-7.8-2.7-10.9zM8.7 14c-.9 0-1.7-.9-1.7-2s.8-2 1.7-2 1.7.9 1.7 2-.7 2-1.7 2zm6.6 0c-.9 0-1.7-.9-1.7-2s.8-2 1.7-2 1.7.9 1.7 2-.8 2-1.7 2z"/></svg>' };
+const isPonsId = (id) => { id = lc(id); return !!(PONS.byId[id] || PONS.grad.has(id)); };
+function linksHTML(id) {
+  id = lc(id); const s = SOC[id] || {}, a = (href, cls, title, inner) => `<a class="lk ${cls}" href="${esc(href)}" target="_blank" rel="noopener noreferrer nofollow" title="${title}" onclick="event.stopPropagation()">${inner}</a>`;
+  let h = "";
+  if (isPonsId(id)) h += a(`https://ponsfamily.com/launchpad/${id}`, "pons", "Open on Pons", "PONS");
+  if (s.x) h += a(s.x, "", "X / Twitter", ICO.x);
+  if (s.web) h += a(s.web, "", "Website", ICO.web);
+  if (s.tg) h += a(s.tg, "", "Telegram", ICO.tg);
+  if (s.dc) h += a(s.dc, "", "Discord", ICO.dc);
+  return h ? `<span class="links">${h}</span>` : "";
+}
+// links for the selected token in the chart header (reads socials() when not known yet)
+async function showLinks(id) {
+  id = lc(id); const el = $("t-links"); el.innerHTML = linksHTML(id).replace(/^<span class="links">|<\/span>$/g, "");
+  if (!SOC[id] && !QUOTES.has(id)) {
+    try { const [r] = await multicall([[id, IER(), "socials"]]); setSocials(id, r); } catch { SOC[id] = {}; }
+    if (lc(S.sel?.base.id) === id) el.innerHTML = linksHTML(id).replace(/^<span class="links">|<\/span>$/g, "");
+  }
+}
 // an image that fails once is dropped for the session, so the letter avatar stays
 window.tpImgFail = (el) => { const k = el.parentElement?.dataset.tok; if (k) delete IMG[k]; el.remove(); };
 function setLogo(id, uri) {
@@ -759,6 +804,9 @@ function queueLogos() { clearTimeout(logoTimer); logoTimer = setTimeout(async ()
   const ids = [...new Set([...document.querySelectorAll("[data-tok]")].map(e => e.dataset.tok))].filter(id => /^0x[0-9a-f]{40}$/.test(id) && !IMG[id] && !LOGO_TRIED.has(id) && !QUOTES.has(id)).slice(0, 120);
   if (!ids.length) return; ids.forEach(id => LOGO_TRIED.add(id));
   try { const r = await multicall(ids.map(id => [id, IER(), "logo"])); ids.forEach((id, i) => setLogo(id, r[i])); } catch {}
+  // graduated Pons rows also get their X / website links
+  const soc = ids.filter(id => isPonsId(id) && !SOC[id]);
+  if (soc.length) { try { const r = await multicall(soc.map(id => [id, IER(), "socials"])); soc.forEach((id, i) => setSocials(id, r[i])); if (S.src === "grad") renderTable(); } catch {} }
 }, 700); }
 new MutationObserver(() => queueLogos()).observe(document.body, { childList: true, subtree: true });
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -983,7 +1031,7 @@ async function renderTable() {
     const col4 = sort === "new" ? (S.src === "grad" ? (PONS.gradBlock[id] ? ago(blockTime(PONS.gradBlock[id])) : "—") : ago(p.created_at)) : fmtUsd(p.volume_usd);
     return `<tr>
     <td>${starBtn(base.id)}</td>
-    <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b>${tag}<span class="nm">${esc(base.name || "")}</span><span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
+    <td><div class="asset">${avHTML(base.symbol, base.id)}<b>${esc(base.symbol)}</b>${tag}<span class="nm">${esc(base.name || "")}</span>${S.src === "grad" ? linksHTML(base.id) : ""}<span class="muted pq" style="font-size:11px">/ ${esc(quote.symbol || "")}</span></div></td>
     <td class="r b">${t && t.price > 0 ? fmtPrice(t.price) : "—"}</td>
     <td class="r">${col4}</td>
     <td class="r">${t ? chipHTML(t.change) : '<span class="muted">—</span>'}</td>
@@ -1012,7 +1060,7 @@ async function renderCurveTable(seq) {
     const pct = Math.max(0, Math.min(1, L.progress || 0)) * 100;
     const price = L.priceUsd > 0 ? fmtPrice(L.priceUsd) : L.priceQ > 0 ? fmtSmall(L.priceQ) + " " + esc(L.pairSym) : "—";
     return `<tr>
-    <td><div class="asset">${avHTML(L.symbol, L.id)}<b>${esc(L.symbol)}</b><span class="nm">${esc(L.name || "")}</span>${L.pairSym !== "ETH" ? `<span class="muted pq" style="font-size:11px">/ ${esc(L.pairSym)}</span>` : ""}</div></td>
+    <td><div class="asset">${avHTML(L.symbol, L.id)}<b>${esc(L.symbol)}</b><span class="nm">${esc(L.name || "")}</span>${linksHTML(L.id)}${L.pairSym !== "ETH" ? `<span class="muted pq" style="font-size:11px">/ ${esc(L.pairSym)}</span>` : ""}</div></td>
     <td class="r b">${price}</td>
     <td class="r">${L.mcap > 0 ? fmtUsd(L.mcap) : "—"}</td>
     <td><span class="gm${pct >= 80 ? " hot" : ""}" title="${fmtNum(L.raised, 4)} of ${fmtNum(L.threshold, 4)} ${esc(L.pairSym)} raised"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct < 10 ? pct.toFixed(1) : pct.toFixed(0)}%</span></span></td>
@@ -1033,7 +1081,7 @@ const READ_RPC = () => CONFIG.RPC_PROXY ? location.origin + CONFIG.RPC_PROXY : C
 const rpc = () => rpcP || (rpcP = new ethers.JsonRpcProvider(READ_RPC(), CONFIG.CHAIN_ID, { staticNetwork: true, batchMaxCount: 20 }));
 const IFC = () => (IFC.f ||= new ethers.Interface(ABI.factory));
 const ICV = () => (ICV.c ||= new ethers.Interface(ABI.curve));
-const IER = () => (IER.e ||= new ethers.Interface([...ABI.erc20, "function name() view returns (string)", "function totalSupply() view returns (uint256)", "function logo() view returns (string)"]));
+const IER = () => (IER.e ||= new ethers.Interface([...ABI.erc20, "function name() view returns (string)", "function totalSupply() view returns (uint256)", "function logo() view returns (string)", "function socials() view returns (string twitter, string telegram, string discord, string website, string farcaster)"]));
 const IV1 = () => (IV1.v ||= new ethers.Interface(ABI.ponsV1Token));
 const IMC = () => (IMC.m ||= new ethers.Interface(["function aggregate3((address target,bool allowFailure,bytes callData)[] calls) payable returns ((bool success,bytes returnData)[])"]));
 // calls: [[target, iface, fn, args]] -> decoded value per call (null when it reverted)
@@ -1114,12 +1162,12 @@ async function readLaunchState(list) {
   const calls = [];
   for (const L of list) {
     calls.push([CONFIG.PONS_FACTORY, IFC(), "getLaunchedToken", [L.id]]);
-    if (L.symbol == null) calls.push([L.id, IER(), "symbol"], [L.id, IER(), "name"], [L.id, IER(), "totalSupply"], [L.id, IER(), "decimals"], [L.id, IER(), "logo"]);
+    if (L.symbol == null) calls.push([L.id, IER(), "symbol"], [L.id, IER(), "name"], [L.id, IER(), "totalSupply"], [L.id, IER(), "decimals"], [L.id, IER(), "logo"], [L.id, IER(), "socials"]);
   }
   const r = await multicall(calls); let k = 0;
   for (const L of list) {
     const g = r[k++];
-    if (L.symbol == null) { L.symbol = String(r[k++] ?? "?"); L.name = String(r[k++] ?? ""); L.supplyRaw = r[k++]; L.dec = Number(r[k++] ?? 18); setLogo(L.id, r[k++]); }
+    if (L.symbol == null) { L.symbol = String(r[k++] ?? "?"); L.name = String(r[k++] ?? ""); L.supplyRaw = r[k++]; L.dec = Number(r[k++] ?? 18); setLogo(L.id, r[k++]); setSocials(L.id, r[k++]); }
     if (g && g.exists) { L.phase = Number(g.phase); L.curve = g.curve; L.pair = lc(g.pairToken); if (L.phase === 2) { PONS.grad.add(L.id); PONS.gradBlock[L.id] ||= L.block; } }
     else L.phase = -1;
   }
@@ -1256,6 +1304,7 @@ async function selectPool(pool) {
   $("t-sym").innerHTML = `${esc(base.symbol || "?")} <span class="muted" style="font-weight:600;font-size:13px">/ ${esc(quote.symbol || "")}</span>`;
   $("t-name").textContent = base.name || "";
   const a = $("t-addr"); a.textContent = short(base.id); a.href = `${CONFIG.EXPLORER}/token/${base.id}`;
+  showLinks(base.id);
   $("cp").onclick = (e) => copy(base.id, e.currentTarget);
   $("tx-pool").textContent = base.symbol || "";
   showTokenStats(S.tokens[lc(base.id)]);
