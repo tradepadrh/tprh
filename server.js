@@ -32,6 +32,8 @@ function buildConfig() {
   if (process.env.EXPLORER_URL) cfg.EXPLORER = process.env.EXPLORER_URL.replace(/\/+$/, "");
   const phase = Number(process.env.ROADMAP_PHASE);
   if (Number.isInteger(phase) && phase >= 1 && phase <= 4) cfg.PHASE = phase;   // roadmap: phases up to this one are live
+  // WalletConnect (mobile wallets, QR). A public project id from cloud.reown.com, not a secret.
+  if (/^[0-9a-f]{32}$/i.test((process.env.WALLETCONNECT_PROJECT_ID || "").trim())) cfg.WC_PROJECT_ID = process.env.WALLETCONNECT_PROJECT_ID.trim();
   // public read-only RPC used by the browser for the Pons launch list (never put a private RPC key here)
   if (/^https:\/\//.test(process.env.PUBLIC_RPC_URL || "")) cfg.RPC = process.env.PUBLIC_RPC_URL.trim();
   return "window.TRADEPAD_CONFIG = " + JSON.stringify(cfg) + ";\n";
@@ -56,6 +58,21 @@ const SECURITY_HEADERS = {
   "X-Frame-Options": "DENY",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
+// Page CSP: scripts only from this site and the pinned CDNs; nobody may frame the DEX (clickjacking).
+// connect-src stays open to https/wss because wallets (WalletConnect relay, Coinbase) talk to their own hosts.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://esm.sh",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com https://fonts.reown.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https: wss:",
+  "frame-src https://verify.walletconnect.com https://verify.walletconnect.org https://secure.walletconnect.org https://keys.coinbase.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, ...headers });
   res.end(body);
@@ -164,6 +181,7 @@ const server = http.createServer((req, res) => {
     const isHtml = ext === ".html";
     res.writeHead(200, {
       ...SECURITY_HEADERS,
+      ...(isHtml ? { "Content-Security-Policy": CSP } : {}),
       "Content-Type": TYPES[ext] || "application/octet-stream",
       "Cache-Control": isHtml || target.endsWith("config.js") ? "no-cache" : "public, max-age=86400",
     });

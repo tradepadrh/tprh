@@ -69,6 +69,23 @@ a { color: inherit; }
 .link { width: 18px; height: 2px; border-radius: 2px; background: var(--line); flex: none; }
 .link.done { background: var(--volt); box-shadow: 0 0 8px rgba(204, 255, 4, .5); }
 @media (max-width: 1240px) { .ph .st { display: none; } }
+/* wallet picker */
+.wm-list { display: grid; gap: 8px; margin: 14px 0 6px; }
+.wm-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); text-align: left; transition: border-color .2s, background .2s; }
+.wm-item:hover { border-color: rgba(204, 255, 4, .55); background: rgba(204, 255, 4, .06); }
+.wm-item.busy { border-color: var(--volt); }
+.wm-item b { display: block; font-size: 15px; } .wm-item small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.wm-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 255, 255, .06); overflow: hidden; flex: none; }
+.wm-ic img, .wm-ic svg { width: 30px; height: 30px; border-radius: 8px; }
+.wm-go { margin-left: auto; font-size: 22px; color: var(--faint); }
+.wm-note { font-size: 12px; color: var(--faint); padding: 6px 4px 0; line-height: 1.5; }
+.wm-note code { font-size: 11px; color: var(--muted); }
+.wm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 4px; }
+.wm-actions .btn { justify-content: center; text-decoration: none; }
+.wm-safe { list-style: none; padding: 14px 0 0; margin: 14px 0 0; border-top: 1px solid var(--line); display: grid; gap: 7px; }
+.wm-safe li { display: flex; gap: 9px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.wm-safe li::before { content: "✓"; color: var(--volt); font-weight: 800; }
+#wm-msg { margin-top: 10px; }
 /* roadmap card */
 .rm { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
 .rm[hidden] { display: none; }
@@ -563,6 +580,28 @@ th.r, td.r { text-align: right; }
   </div>
 </div>
 
+<div class="rm" id="wm" hidden role="dialog" aria-modal="true" aria-labelledby="wm-t">
+  <div class="rm-card glass wm-card">
+    <button class="icon-btn rm-x" id="wm-x" aria-label="Close">✕</button>
+    <div id="wm-pick">
+      <div class="rm-k">Robinhood Chain · 4663</div>
+      <h3 id="wm-t">Connect a wallet</h3>
+      <div class="wm-list" id="wm-list"></div>
+    </div>
+    <div id="wm-account" hidden>
+      <div class="rm-k">Connected</div>
+      <h3 style="font-size:22px;word-break:break-all" id="wm-addr"></h3>
+      <p class="lead" id="wm-via"></p>
+      <div class="wm-actions"><button class="btn" id="wm-copy">Copy address</button><a class="btn" id="wm-exp" target="_blank" rel="noopener noreferrer">View on explorer</a><button class="btn" id="wm-switch">Change wallet</button><button class="btn" id="wm-off">Disconnect</button></div>
+    </div>
+    <div class="msg" id="wm-msg" hidden></div>
+    <ul class="wm-safe">
+      <li>TradePad never asks for your seed phrase or private key.</li>
+      <li>Every swap is simulated on-chain first; your wallet shows the exact amounts before you sign.</li>
+      <li>Token approvals are for the exact amount of each sell, never unlimited.</li>
+    </ul>
+  </div>
+</div>
 <div class="rm" id="rm" hidden role="dialog" aria-modal="true" aria-labelledby="rm-t">
   <div class="rm-card glass">
     <button class="icon-btn rm-x" id="rm-x" aria-label="Close">✕</button>
@@ -1393,23 +1432,141 @@ $("venues").querySelectorAll("button").forEach(b => b.onclick = () => {
   $("venues").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); S.venue = b.dataset.v; renderTable(); renderTrend();
 });
 
-// ======================= WALLET =======================
-async function connect() {
+// ======================= WALLET (wagmi) =======================
+// wagmi core (no React) finds every installed wallet through EIP-6963 (MetaMask, Rabby, OKX, Phantom,
+// Robinhood Wallet extension, ...), plus Coinbase Wallet and WalletConnect for mobile wallets.
+// TradePad never sees keys: wallets sign in their own window. Versions are pinned.
+const WAGMI_URL = { core: "https://esm.sh/@wagmi/core@2.16.3", conn: "https://esm.sh/@wagmi/connectors@5.7.3", viem: "https://esm.sh/viem@2.21.54" };
+let WG = null;                                    // { W, cfg } once loaded
+async function wagmi() {
+  if (WG) return WG;
+  return WG = (async () => {
+    const [W, C, V] = await Promise.all([import(WAGMI_URL.core), import(WAGMI_URL.conn), import(WAGMI_URL.viem)]);
+    const chain = V.defineChain({ id: CONFIG.CHAIN_ID, name: "Robinhood Chain", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [CONFIG.RPC] } }, blockExplorers: { default: { name: "Blockscout", url: CONFIG.EXPLORER } } });
+    const connectors = [C.injected({ shimDisconnect: true }), C.coinbaseWallet({ appName: "TradePad", appLogoUrl: location.origin + "/tp-mark.svg" })];
+    if (CONFIG.WC_PROJECT_ID) connectors.push(C.walletConnect({ projectId: CONFIG.WC_PROJECT_ID, showQrModal: true,
+      metadata: { name: "TradePad", description: "The Pons-native DEX on Robinhood Chain", url: location.origin, icons: [location.origin + "/tp-mark.svg"] },
+      qrModalOptions: { themeMode: "dark", themeVariables: { "--wcm-accent-color": "#CCFF04", "--wcm-accent-fill-color": "#141A00", "--wcm-background-color": "#1F1B16" } } }));
+    const cfg = W.createConfig({ chains: [chain], connectors, multiInjectedProviderDiscovery: true, transports: { [chain.id]: W.http(CONFIG.RPC) }, ssr: false });
+    return { W, cfg };
+  })().catch(e => { WG = null; throw e; });
+}
+// wallets to list: discovered EIP-6963 wallets first, then the generic browser wallet, Coinbase, WalletConnect
+function walletList(W, cfg) {
+  const all = W.getConnectors(cfg), seen = new Set(), out = [];
+  for (const c of all) {
+    if (c.id === "injected") continue;                                     // generic entry added below if nothing was discovered
+    if (seen.has(c.name)) continue; seen.add(c.name); out.push(c);
+  }
+  const announced = all.some(c => c.type === "injected" && c.id !== "injected");
+  const generic = all.find(c => c.id === "injected");
+  if (!announced && window.ethereum && generic) out.unshift(generic);
+  const rank = (c) => c.type === "injected" ? 0 : c.type === "coinbaseWallet" ? 1 : 2;
+  return out.sort((a, b) => rank(a) - rank(b));
+}
+const WALLET_ICON = { coinbaseWallet: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#0052FF"/><rect x="11" y="11" width="10" height="10" rx="2" fill="#fff"/></svg>',
+  walletConnect: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#3B99FC"/><path d="M9.6 12.9c3.5-3.4 9.3-3.4 12.8 0l.4.4a.4.4 0 010 .6l-1.5 1.4a.2.2 0 01-.3 0l-.6-.6c-2.5-2.4-6.3-2.4-8.8 0l-.6.6a.2.2 0 01-.3 0l-1.5-1.4a.4.4 0 010-.6zm15.9 2.9l1.3 1.3a.4.4 0 010 .6l-6 5.8a.5.5 0 01-.6 0L16 19.4a.1.1 0 00-.2 0l-4.2 4.1a.5.5 0 01-.6 0l-6-5.8a.4.4 0 010-.6l1.3-1.3a.5.5 0 01.6 0l4.2 4.1a.1.1 0 00.2 0l4.2-4.1a.5.5 0 01.6 0l4.2 4.1a.1.1 0 00.2 0l4.2-4.1a.5.5 0 01.6 0z" fill="#fff"/></svg>',
+  injected: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 12.5h2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>' };
+function iconFor(c) {
+  if (c.icon && /^(data:image\/|https:\/\/)/.test(c.icon)) return `<img src="${esc(c.icon)}" alt="">`;   // EIP-6963 icons are data URIs
+  return WALLET_ICON[c.type] || WALLET_ICON.injected;
+}
+async function openWalletPicker() {
+  $("wm").hidden = false; $("wm-list").innerHTML = '<div class="muted" style="padding:14px">Looking for wallets…</div>'; $("wm-msg").hidden = true;
+  $("wm-account").hidden = true; $("wm-pick").hidden = false; $("wm-x").focus();
+  let wg; try { wg = await wagmi(); } catch { return legacyConnect(); }       // CDN unreachable: plain browser wallet
+  await new Promise(r => setTimeout(r, 250));                                // EIP-6963 announcements arrive asynchronously
+  const list = walletList(wg.W, wg.cfg);
+  $("wm-list").innerHTML = list.map((c, i) => {
+    const tag = c.type === "injected" ? "Detected" : c.type === "walletConnect" ? "QR · mobile" : "App & extension";
+    return `<button class="wm-item" data-i="${i}"><span class="wm-ic">${iconFor(c)}</span><span><b>${esc(c.name === "Injected" ? "Browser wallet" : c.name)}</b><small>${tag}</small></span><span class="wm-go">›</span></button>`;
+  }).join("") + (CONFIG.WC_PROJECT_ID ? "" : `<div class="wm-note">Mobile wallets by QR appear once <code>WALLETCONNECT_PROJECT_ID</code> is set on the server.</div>`);
+  $("wm-list").querySelectorAll(".wm-item").forEach(b => b.onclick = () => connectWith(list[Number(b.dataset.i)], b));
+}
+function wmMsg(text, kind) { const m = $("wm-msg"); m.hidden = false; m.className = "msg" + (kind ? " " + kind : ""); m.textContent = text; }
+async function connectWith(connector, btn) {
+  const { W, cfg } = await wagmi();
+  btn?.classList.add("busy"); wmMsg(`Open ${connector.name} and approve the connection.`);
+  try {
+    if (W.getAccount(cfg).status === "connected") await W.disconnect(cfg);
+    await W.connect(cfg, { connector, chainId: CONFIG.CHAIN_ID });
+    await useConnector(connector);
+    $("wm").hidden = true;
+  } catch (e) {
+    const m = errText(e);
+    wmMsg(/chain|network/i.test(m) && !/rejected/i.test(m) ? "Your wallet could not switch to Robinhood Chain (4663). Add the network in the wallet, then try again." : m, "err");
+  } finally { btn?.classList.remove("busy"); }
+}
+// hand the wallet's EIP-1193 provider to ethers, which the rest of the DEX already uses
+async function useConnector(connector) {
+  const { W, cfg } = await wagmi();
+  if (W.getAccount(cfg).chainId !== CONFIG.CHAIN_ID) await W.switchChain(cfg, { chainId: CONFIG.CHAIN_ID });
+  const eip1193 = await connector.getProvider();
+  const provider = new ethers.BrowserProvider(eip1193, CONFIG.CHAIN_ID); provider.pollingInterval = 1200;
+  const signer = await provider.getSigner();
+  S.wallet = { provider, signer, address: await signer.getAddress(), connector: connector.name };
+  showConnected();
+  await readRouter(); refreshWallet(); checkPons();
+}
+function showConnected() {
+  $("w-t").textContent = short(S.wallet.address);
+  $("w-av").outerHTML = avHTML(S.wallet.address.slice(2, 5), S.wallet.address).replace('class="av"', 'class="av" id="w-av"');
+}
+// account changes, chain changes and disconnects from inside the wallet
+let watching = false;
+async function watchWallet() {
+  if (watching) return; watching = true;
+  const { W, cfg } = await wagmi();
+  W.watchAccount(cfg, { onChange(acc, prev) {
+    if (!S.wallet) return;
+    if (acc.status === "disconnected") { location.reload(); return; }
+    if (acc.address && prev.address && acc.address !== prev.address) location.reload();      // fresh state for a new account
+    else if (acc.chainId && acc.chainId !== CONFIG.CHAIN_ID) { showMsg("Your wallet switched away from Robinhood Chain. Trades are paused until you switch back.", "err"); S.wrongChain = true; }
+    else if (acc.chainId === CONFIG.CHAIN_ID && S.wrongChain) { S.wrongChain = false; location.reload(); }
+  } });
+}
+// restore the last session silently (wagmi remembers only which wallet was used, never keys)
+(async () => {
+  try {
+    const { W, cfg } = await wagmi(); await W.reconnect(cfg);
+    const acc = W.getAccount(cfg);
+    if (acc.status === "connected" && acc.connector) { await useConnector(acc.connector); }
+    watchWallet();
+  } catch {}
+})();
+// fallback when the wagmi CDN is unreachable: the page's own injected wallet
+async function legacyConnect() {
+  $("wm").hidden = true;
   const eth = window.ethereum;
-  if (!eth) { showMsg("No wallet detected on this page. Open the DEX from your own domain with MetaMask or Robinhood Wallet installed.", "err"); jump("c-swap"); return; }
+  if (!eth) { showMsg("No wallet found. Install a wallet extension (MetaMask, Rabby, Robinhood Wallet) and reload.", "err"); jump("c-swap"); return; }
   try {
     await eth.request({ method: "eth_requestAccounts" });
     try { await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x" + CONFIG.CHAIN_ID.toString(16) }] }); }
     catch (e) { if (e.code === 4902) { showMsg("Add Robinhood Chain (chain id 4663) to your wallet first, then connect again.", "err"); return; } }
     const provider = new ethers.BrowserProvider(eth); provider.pollingInterval = 1200; const signer = await provider.getSigner();
-    S.wallet = { provider, signer, address: await signer.getAddress() };
-    $("w-t").textContent = short(S.wallet.address);
-    $("w-av").outerHTML = avHTML(S.wallet.address.slice(2, 5), S.wallet.address).replace('class="av"', 'class="av" id="w-av"');
+    S.wallet = { provider, signer, address: await signer.getAddress(), connector: "Browser wallet" }; showConnected();
     eth.on?.("accountsChanged", () => location.reload()); eth.on?.("chainChanged", () => location.reload());
     await readRouter(); refreshWallet(); checkPons();
   } catch (e) { showMsg(errText(e), "err"); }
 }
-$("connect").onclick = () => S.wallet ? copy(S.wallet.address, $("w-t"), short(S.wallet.address)) : connect();
+function openAccount() {
+  $("wm").hidden = false; $("wm-pick").hidden = true; $("wm-account").hidden = false; $("wm-msg").hidden = true;
+  $("wm-addr").textContent = S.wallet.address; $("wm-via").textContent = "Connected with " + (S.wallet.connector || "wallet") + " · Robinhood Chain";
+  $("wm-exp").href = `${CONFIG.EXPLORER}/address/${S.wallet.address}`; $("wm-x").focus();
+}
+async function disconnectWallet() {
+  try { const { W, cfg } = await wagmi(); await W.disconnect(cfg); } catch {}
+  location.reload();
+}
+const connect = openWalletPicker;
+$("connect").onclick = () => S.wallet ? openAccount() : openWalletPicker();
+$("wm-x").onclick = () => { $("wm").hidden = true; };
+$("wm").addEventListener("click", (e) => { if (e.target === $("wm")) $("wm").hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("wm").hidden) $("wm").hidden = true; });
+$("wm-copy").onclick = () => copy(S.wallet.address, $("wm-copy"), "Copy address");
+$("wm-off").onclick = disconnectWallet;
+$("wm-switch").onclick = () => { $("wm-account").hidden = true; openWalletPicker(); };
 async function refreshWallet() {
   if (!S.wallet) { $("w-eth").textContent = "0.00"; return; }
   try {
@@ -1682,6 +1839,9 @@ $("go").onclick = async () => {
       if ((await t.allowance(me, S.router)) < q.amountIn) { go.textContent = "Approving token…"; showMsg("Confirm the approval in your wallet."); await (await t.approve(S.router, q.amountIn)).wait(); }
     }
     // simulate first with the live chain state: the real output (all Pons taxes included) sets the minimum
+    // safety: never send on another chain
+    const net = await S.wallet.provider.getNetwork();
+    if (Number(net.chainId) !== CONFIG.CHAIN_ID) throw new Error("Your wallet is not on Robinhood Chain (4663). Switch network in the wallet and try again.");
     go.textContent = "Checking price…";
     const sim = info.route === "v3"
       ? (S.side === "buy" ? router.buyV3.staticCall(S.sel.base.id, info.poolFee, 0n, deadline, { value: q.amountIn }) : router.sellV3.staticCall(S.sel.base.id, info.poolFee, q.amountIn, 0n, deadline))
