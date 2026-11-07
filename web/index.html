@@ -264,6 +264,8 @@ body.noscroll { overflow: hidden; }
 .rd-toast { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 18px; background: rgba(28, 25, 21, .97); border: 1px solid rgba(204, 255, 4, .45); box-shadow: 0 18px 40px rgba(0, 0, 0, .55), 0 0 30px rgba(204, 255, 4, .12); cursor: pointer; font-size: 13px; animation: rdin .35s ease-out; }
 .rd-toast .av { width: 34px; height: 34px; font-size: 11px; flex: none; }
 .rd-toast b { display: block; font-size: 14px; } .rd-toast span { color: var(--muted); }
+.rd-toast .tx { min-width: 0; } .rd-toast .qb { margin-left: auto; flex: none; height: 34px; padding: 0 13px; }
+.rd-la { display: flex; align-items: center; gap: 10px; } .rd-log .qb { height: 28px; padding: 0 10px; font-size: 11.5px; }
 .rd-toast .k { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: .14em; color: var(--volt); align-self: flex-start; }
 @keyframes rdin { from { transform: translateY(14px); opacity: 0; } }
 @media (max-width: 760px) {
@@ -2603,8 +2605,11 @@ function rdAlert(L, kind, text, any) {
   const sym = L.symbol || "Token", item = { t: Date.now(), id: L.id, sym, text, kind };
   RD.log.unshift(item); RD.log.length = Math.min(RD.log.length, 60);
   const el = document.createElement("div"); el.className = "rd-toast"; el.setAttribute("role", "status");
-  el.innerHTML = `${avHTML(sym, L.id)}<div><b>${esc(sym)}</b><span>${esc(text)}</span></div><span class="k">RADAR</span>`;
-  el.onclick = () => { el.remove(); rdTrade(L.id); };
+  const canBuy = (PONS.byId[L.id] || L).phase === 0;   // quick buy runs on the bonding curve
+  el.innerHTML = `${avHTML(sym, L.id)}<div class="tx"><b>${esc(sym)}</b><span>${esc(text)}</span></div>` +
+    (canBuy ? `<button class="qb" data-tqb title="Buy ${esc(S.qb)} ETH now. Your wallet still asks you to confirm.">${BOLT}<span>${esc(S.qb)}</span></button>` : `<span class="k">RADAR</span>`);
+  // the bolt buys right away with the saved amount (wallet confirms); anywhere else opens the trade window
+  el.onclick = (e) => { const q = e.target.closest("[data-tqb]"); el.remove(); rdTrade(L.id, !!q); };
   $("rd-toasts").prepend(el); while ($("rd-toasts").children.length > 4) $("rd-toasts").lastChild.remove();
   setTimeout(() => el.remove(), 9000);
   if (RD.prefs.push && "Notification" in window && Notification.permission === "granted") {
@@ -2651,9 +2656,9 @@ function rdAlertsTab() {
   const tg = (k, l) => `<button data-pref="${k}" aria-pressed="${!!P[k]}">${l}</button>`;
   return `<div class="rd-sec"><h4>Alert me when</h4><div class="rd-toggles">${tg("a50", "A curve passes 50%")}${tg("a80", "A curve passes 80%")}${tg("grad", "A token graduates")}${tg("newFollow", "A followed wallet launches")}</div>
       <h4>For</h4><div class="rd-toggles"><button data-scope="watch" aria-pressed="${P.scope === "watch"}">My watchlist + followed creators</button><button data-scope="all" aria-pressed="${P.scope === "all"}">Every Pons launch</button></div>
-      <p>Alerts show here and as a pop-up while TradePad is open in a tab. Settings stay in this browser.</p>
+      <p>Alerts show here and as a pop-up while TradePad is open in a tab. Hit ⚡ on a pop-up to buy your quick-buy amount right away (your wallet still asks you to confirm). Settings stay in this browser.</p>
       <div class="rd-toggles">${perm === "unsupported" ? `<button disabled>Browser notifications not supported</button>` : perm === "denied" ? `<button disabled>Notifications are blocked in this browser's site settings</button>` : `<button data-push aria-pressed="${P.push && perm === "granted"}">Browser notifications</button>`}</div></div>
-    <div class="rd-sec"><h4>Recent alerts</h4>${RD.log.length ? `<div class="rd-list">${RD.log.map(a => `<div class="rd-log" data-go="${esc(a.id)}"><time>${new Date(a.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><span><b>${esc(a.sym)}</b> ${esc(a.text)}</span><span class="muted">Trade ›</span></div>`).join("")}</div>` : `<p>Nothing yet. Alerts appear here as soon as a curve crosses a level you picked.</p>`}</div>`;
+    <div class="rd-sec"><h4>Recent alerts</h4>${RD.log.length ? `<div class="rd-list">${RD.log.map(a => `<div class="rd-log" data-go="${esc(a.id)}"><time>${new Date(a.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><span><b>${esc(a.sym)}</b> ${esc(a.text)}</span><span class="rd-la"><button class="qb" data-goqb="${esc(a.id)}" title="Quick buy ${esc(S.qb)} ETH">${BOLT}<span>${esc(S.qb)}</span></button><span class="muted">Trade ›</span></span></div>`).join("")}</div>` : `<p>Nothing yet. Alerts appear here as soon as a curve crosses a level you picked.</p>`}</div>`;
 }
 function rdWalletsTab() {
   const f = Object.entries(RD.follow);
@@ -2725,7 +2730,7 @@ function wireRadar(body) {
       rdTrade(id);
     };
   });
-  body.querySelectorAll("[data-go]").forEach(x => x.onclick = () => rdTrade(x.dataset.go));
+  body.querySelectorAll("[data-go]").forEach(x => x.onclick = (e) => rdTrade(x.dataset.go, !!e.target.closest("[data-goqb]")));
   body.querySelectorAll("[data-pref]").forEach(b => b.onclick = () => { RD.prefs[b.dataset.pref] = !RD.prefs[b.dataset.pref]; rdSave(); renderRadar(true); });
   body.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { RD.prefs.scope = b.dataset.scope; rdSave(); renderRadar(true); });
   const push = body.querySelector("[data-push]");
