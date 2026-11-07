@@ -398,7 +398,66 @@ body.noscroll { overflow: hidden; }
 @media (max-width: 760px) {
   .dash { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .col { display: contents; }
-  #c-chart { order: 1; } #c-swap { order: 2; } #c-table { order: 3; } #c-trend { order: 4; } #c-wallet { order: 5; } #c-watch { order: 6; } #c-trades { order: 7; } #c-rev { order: 8; }
+  #c-table { order: 0; } #c-chart { order: 1; } #c-swap { order: 2; } #c-trend { order: 4; } #c-wallet { order: 5; } #c-watch { order: 6; } #c-trades { order: 7; } #c-rev { order: 8; }
+}
+
+/* ---------- terminal layout (v25) ---------- */
+#c-rev[hidden], #tab-fee[hidden], .venues[hidden] { display: none !important; }
+/* header: the official token chip sits inside the bar */
+.top #proj { margin: 0; padding: 4px 4px 4px 8px; border-radius: 99px; gap: 6px; flex-wrap: nowrap; min-width: 0; }
+.top #proj .ca .full { display: none; } .top #proj .ca .short { display: inline; }
+.top #proj .ca { padding: 5px 10px; font-size: 12.5px; word-break: normal; white-space: nowrap; }
+.top #proj .pb { height: 30px; padding: 0 11px; font-size: 12px; white-space: nowrap; }
+.top #proj .lbl, .top #proj .sp, .top #proj a.pb:not(.buy) { display: none; }
+.top .grow { flex: 1; }
+.top #proj .sym { font-size: 13.5px; } .top #proj .sym .av { width: 22px; height: 22px; }
+/* hero becomes a thin stat bar */
+.pulse { margin-top: 12px; border-radius: 20px; }
+.pulse canvas, .pulse h1, .gauge, .hero-mark, .pulse-legend { display: none !important; }
+.pulse-in { padding: 0; gap: 0; display: flex; align-items: center; pointer-events: auto; }
+.pulse .hero-row { flex: none; flex-wrap: nowrap; padding: 10px 18px; gap: 0; }
+.pulse .pstats { margin: 0; gap: 24px; flex-wrap: nowrap; width: auto; order: 0; }
+.pulse .pstat { display: flex; flex-direction: row-reverse; align-items: baseline; gap: 7px; white-space: nowrap; }
+.pulse .pstat b { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.pulse .pstat > span { margin: 0; }
+.pulse .ticker { flex: 1; min-width: 0; margin: 0; border-top: 0; border-left: 1px solid var(--line); background: none; }
+/* token list card */
+.lsearch { padding: 14px 14px 2px; } .lsearch .search { width: 100%; }
+#src button { flex-direction: column; justify-content: center; gap: 4px; text-align: center; padding-block: 9px; }
+#src button small { display: none; } #src button b { white-space: nowrap; }
+#sorts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } #sorts::-webkit-scrollbar { display: none; } #sorts > * { flex: none; }
+#c-table .venues { margin-top: 2px; } #c-table .venues button { padding: 6px 12px; font-size: 12.5px; }
+@media (min-width: 1101px) {
+  .top { flex-wrap: nowrap; }
+  .dash { grid-template-columns: minmax(400px, 460px) minmax(0, 1fr) minmax(310px, 340px); gap: 14px; padding-block: 14px 24px; }
+  .col { gap: 14px; }
+  .col-left { align-self: stretch; align-content: start; }
+  #c-table { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 78px); height: calc(100vh - 92px); display: flex; flex-direction: column; }
+  #c-table .tbl-wrap { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+  #c-table thead th { position: sticky; top: 0; z-index: 1; background: #26221d; }
+  #c-watch { display: none; }
+  #c-chart .hstat.opt, #c-chart .ch-head > .btn { display: none; }
+  #c-chart .ch-head { flex-wrap: nowrap; } #c-chart .ch-head .tok { flex: 1; min-width: 0; }
+}
+/* the trade column follows you down the page when the screen is tall enough to show all of it */
+@media (min-width: 1101px) and (min-height: 860px) { .col-right { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 78px); } }
+@media (min-width: 1101px) and (max-width: 1360px) { .dash { grid-template-columns: 390px minmax(0, 1fr) 310px; } #c-chart .hstat.hv { display: none; } .pulse .pstat:nth-child(3) { display: none; } }
+@media (min-width: 1101px) and (max-width: 1500px) { .top #proj .sym { display: none; } }
+@media (min-width: 761px) and (max-width: 1100px) { .col-left { grid-template-columns: minmax(0, 1fr); order: 0; } #c-table .tbl-wrap { max-height: 70vh; overflow-y: auto; } }
+@media (max-width: 1100px) { .top #proj { order: 10; flex-basis: 100%; justify-content: flex-start; } .top #proj .sp { display: block; flex: 1; } }
+/* phones: bottom tab bar */
+.mtab { display: none; }
+@media (max-width: 760px) {
+  .pulse .hero-row { display: none; }
+  .pulse .ticker { border-left: 0; }
+  #status-t { display: none; }
+  .top.stuck #proj { display: none; }
+  .mtab { display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 45; padding: 6px; border-radius: 24px; background: rgba(30, 27, 24, .92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
+  .mtab button { display: grid; justify-items: center; gap: 3px; padding: 8px 0; border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 11px; border-radius: 18px; }
+  .mtab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .mtab button.on { background: var(--volt); color: var(--volt-fg); }
+  .dash { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); }
+  .foot { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 90px); }
 }
 .card { background: var(--glass); backdrop-filter: blur(28px) saturate(1.3); -webkit-backdrop-filter: blur(28px) saturate(1.3); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: var(--r); min-width: 0; }
 .card.cream { background: rgba(241, 230, 211, .92); color: var(--accent-fg); --muted: rgba(31, 27, 22, .6); --faint: rgba(31, 27, 22, .3); --line: rgba(31, 27, 22, .12); --soft: rgba(31, 27, 22, .06); --accent: #1F1B16; --accent-fg: #F1E6D3; }
@@ -613,12 +672,12 @@ th.r, td.r { text-align: right; }
 <div class="bg" aria-hidden="true"></div>
 <div class="app">
   <div style="min-width:0">
-    <div class="proj glass" id="proj" hidden></div>
     <header class="top">
       <div class="logo glass" aria-label="TradePad"><svg viewBox="8 14 160 160" width="26" height="26" aria-hidden="true"><path fill="var(--volt)" d="M44 41 H150 C158 41 164.5 47 164.5 55 V61.5 L130.5 115.5 C128.5 118.5 125.5 119.5 122 119.5 H92.5 L76.5 147 H53 L82 101 H115.5 L140 61.5 H32.5 Z"/><path fill="var(--volt)" d="M25 71 H122 L109.5 91.5 H73.5 L39.5 147 H16.5 L51 91.5 H12.5 Z"/></svg></div>
       <nav class="nav road glass" id="road" aria-label="Main"></nav>
       <div class="nv-pop glass" id="nv-pop" hidden role="menu"></div>
       <span class="grow"></span>
+      <div class="proj glass" id="proj" hidden></div>
       <span class="status glass" id="status" data-s="live"><i></i><span id="status-t">Robinhood Chain</span></span>
       <button class="menu-btn glass" id="menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
       <button class="wallet glass" id="connect"><span class="av" id="w-av" style="background:rgba(255,255,255,.14)"><svg width="14" height="14"><use href="#i-wallet"/></svg></span><span id="w-t">Connect</span></button>
@@ -639,21 +698,6 @@ th.r, td.r { text-align: right; }
           </div>
           <div class="hero-mark" id="hero-mark" aria-hidden="true"><svg viewBox="8 14 160 160"><path fill="var(--volt)" d="M44 41 H150 C158 41 164.5 47 164.5 55 V61.5 L130.5 115.5 C128.5 118.5 125.5 119.5 122 119.5 H92.5 L76.5 147 H53 L82 101 H115.5 L140 61.5 H32.5 Z"/><path fill="var(--volt)" d="M25 71 H122 L109.5 91.5 H73.5 L39.5 147 H16.5 L51 91.5 H12.5 Z"/></svg></div>
         </div>
-        <div class="chips">
-          <div class="venues" id="venues" role="group" aria-label="DEX filter">
-            <button data-v="" aria-pressed="true">All DEXs</button>
-            <button data-v="v4" aria-pressed="false">Uniswap V4</button>
-            <button data-v="v3" aria-pressed="false">Uniswap V3</button>
-            <button data-v="v2" aria-pressed="false">Uniswap V2</button>
-          </div>
-          <div class="tools">
-            <div class="search">
-              <svg><use href="#i-search"/></svg>
-              <input id="q" type="search" placeholder="Search token or 0x…" autocomplete="off" aria-label="Search token">
-              <div class="results" id="results" hidden></div>
-            </div>
-          </div>
-        </div>
         <div class="ticker" aria-label="Price ticker"><div class="ticker-track" id="ticker"></div></div>
       </div>
     </section>
@@ -663,20 +707,32 @@ th.r, td.r { text-align: right; }
 
       <!-- ============ KIRI ============ -->
       <div class="col col-left">
-        <section class="card pad" id="c-wallet" aria-label="Wallet">
-          <div class="seg" style="margin-bottom:16px"><button aria-pressed="true">Balance</button><button id="tab-fee" aria-pressed="false">Your fees</button></div>
-          <div id="w-bal">
-            <div class="bal"><span id="w-eth">0.00</span><small>ETH</small></div>
-            <div class="addr-row"><span id="w-usd">Connect a wallet to see your balance</span><button class="link-btn" id="w-refresh"><svg><use href="#i-refresh"/></svg>Refresh</button></div>
+        <section class="card" id="c-table" aria-label="All assets">
+          <div class="lsearch"><div class="search">
+              <svg><use href="#i-search"/></svg>
+              <input id="q" type="search" placeholder="Search token or 0x…" autocomplete="off" aria-label="Search token">
+              <div class="results" id="results" hidden></div>
+            </div></div>
+          <div class="src-wrap">
+            <div class="src-rail" id="src" role="tablist" aria-label="Where the token trades">
+              <span class="src-puck" aria-hidden="true"></span>
+              <button role="tab" data-src="curve" aria-selected="false"><svg><use href="#i-curve"/></svg><span style="min-width:0"><b>Pons curve</b><small><i class="live"></i><span id="n-curve">scanning…</span></small></span></button>
+              <button role="tab" data-src="grad" aria-selected="false"><svg><use href="#i-grad"/></svg><span style="min-width:0"><b>Pons graduated</b><small id="n-grad">now on Uniswap</small></span></button>
+              <button role="tab" data-src="uni" aria-selected="false"><svg><use href="#i-pool"/></svg><span style="min-width:0"><b>Uniswap</b><small id="n-uni">all other pairs</small></span></button>
+            </div>
+            <div class="sorts" id="sorts" role="tablist" aria-label="Sort"></div>
+            <div class="venues" id="venues" hidden role="group" aria-label="DEX filter">
+            <button data-v="" aria-pressed="true">All DEXs</button>
+            <button data-v="v4" aria-pressed="false">Uniswap V4</button>
+            <button data-v="v3" aria-pressed="false">Uniswap V3</button>
+            <button data-v="v2" aria-pressed="false">Uniswap V2</button>
           </div>
-          <div class="kpis">
-            <div><b id="k-vol">—</b><span>24h volume</span></div>
-            <div><b id="k-fee">0.50%</b><span>TradePad fee</span></div>
-            <div><b id="k-pons">—</b><span>Pons fee</span></div>
           </div>
-          <div class="pair-btns">
-            <button class="btn btn-p" data-goto="buy"><svg><use href="#i-down"/></svg>Buy</button>
-            <button class="btn btn-o" data-goto="sell"><svg><use href="#i-up"/></svg>Sell</button>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr id="thead"><th style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r">24h volume</th><th class="r">24h change</th><th class="r">Action</th></tr></thead>
+              <tbody id="assets"><tr><td colspan="6" class="muted">Loading market…</td></tr></tbody>
+            </table>
           </div>
         </section>
 
@@ -689,7 +745,7 @@ th.r, td.r { text-align: right; }
           <p class="muted" style="margin:6px 16px 14px;font-size:11px" id="watch-hint">Tap ★ in the assets table to add a token to your watchlist.</p>
         </section>
 
-        <section class="card cream pad" id="c-rev" aria-label="Router revenue">
+        <section class="card cream pad" id="c-rev" aria-label="Router revenue" hidden>
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
             <div class="rev-big" id="rev-amt">—</div>
             <span class="muted" style="font-size:12px">fees collected</span>
@@ -713,7 +769,7 @@ th.r, td.r { text-align: right; }
             </div>
             <div class="hstat"><b id="t-price">—</b><span>Price</span></div>
             <div class="hstat"><b id="t-change" class="chip">—</b><span>24h change</span></div>
-            <div class="hstat"><b id="t-vol">—</b><span>24h volume</span></div>
+            <div class="hstat hv"><b id="t-vol">—</b><span>24h volume</span></div>
             <div class="hstat opt"><b id="t-liq">—</b><span>Liquidity</span></div>
             <button class="btn btn-s" data-goto="buy">Trade</button>
           </div>
@@ -730,24 +786,25 @@ th.r, td.r { text-align: right; }
           </div>
           <div id="chart"><div class="chart-note" id="chart-note">Loading chart…</div></div>
         </section>
-
-        <section class="card" id="c-table" aria-label="All assets">
-          <div class="src-wrap">
-            <div class="src-rail" id="src" role="tablist" aria-label="Where the token trades">
-              <span class="src-puck" aria-hidden="true"></span>
-              <button role="tab" data-src="curve" aria-selected="false"><svg><use href="#i-curve"/></svg><span style="min-width:0"><b>Pons curve</b><small><i class="live"></i><span id="n-curve">scanning…</span></small></span></button>
-              <button role="tab" data-src="grad" aria-selected="false"><svg><use href="#i-grad"/></svg><span style="min-width:0"><b>Pons graduated</b><small id="n-grad">now on Uniswap</small></span></button>
-              <button role="tab" data-src="uni" aria-selected="false"><svg><use href="#i-pool"/></svg><span style="min-width:0"><b>Uniswap</b><small id="n-uni">all other pairs</small></span></button>
-            </div>
-            <div class="sorts" id="sorts" role="tablist" aria-label="Sort"></div>
-          </div>
-          <div class="tbl-wrap">
+        <section class="card" id="c-trades" aria-label="Buy and sell activity">
+          <div class="card-h"><h2>Buy / sell activity</h2><span class="muted" style="font-size:12px" id="tx-pool"></span></div>
+          <div class="tbl-wrap trades">
             <table>
-              <thead><tr id="thead"><th style="width:18px"></th><th>Asset</th><th class="r">Price</th><th class="r">24h volume</th><th class="r">24h change</th><th class="r">Action</th></tr></thead>
-              <tbody id="assets"><tr><td colspan="6" class="muted">Loading market…</td></tr></tbody>
+              <thead><tr><th>Window</th><th class="r">Trades</th><th class="r">Volume</th></tr></thead>
+              <tbody id="txs"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
             </table>
           </div>
         </section>
+        <section class="card" id="c-trend" aria-label="Trending">
+          <div class="card-h" style="padding-bottom:10px">
+            <div class="seg" style="flex:1" role="tablist">
+              <button role="tab" data-tr="volume" aria-selected="true">Trending</button>
+              <button role="tab" data-tr="watch" aria-selected="false">Watchlist</button>
+            </div>
+          </div>
+          <div id="trend"><div class="empty">Loading…</div></div>
+        </section>
+
       </div>
 
       <!-- ============ KANAN ============ -->
@@ -795,24 +852,20 @@ th.r, td.r { text-align: right; }
             <div class="msg" id="router-msg">Swaps go through your PonsRouter contract: it takes the frontend fee, then forwards the trade to the Pons bonding curve or the Uniswap v4 pool.</div>
           </div>
         </section>
-
-        <section class="card" id="c-trend" aria-label="Trending">
-          <div class="card-h" style="padding-bottom:10px">
-            <div class="seg" style="flex:1" role="tablist">
-              <button role="tab" data-tr="volume" aria-selected="true">Trending</button>
-              <button role="tab" data-tr="watch" aria-selected="false">Watchlist</button>
-            </div>
+        <section class="card pad" id="c-wallet" aria-label="Wallet">
+          <div class="seg" style="margin-bottom:16px"><button aria-pressed="true">Balance</button><button id="tab-fee" aria-pressed="false" hidden>Your fees</button></div>
+          <div id="w-bal">
+            <div class="bal"><span id="w-eth">0.00</span><small>ETH</small></div>
+            <div class="addr-row"><span id="w-usd">Connect a wallet to see your balance</span><button class="link-btn" id="w-refresh"><svg><use href="#i-refresh"/></svg>Refresh</button></div>
           </div>
-          <div id="trend"><div class="empty">Loading…</div></div>
-        </section>
-
-        <section class="card" id="c-trades" aria-label="Buy and sell activity">
-          <div class="card-h"><h2>Buy / sell activity</h2><span class="muted" style="font-size:12px" id="tx-pool"></span></div>
-          <div class="tbl-wrap trades">
-            <table>
-              <thead><tr><th>Window</th><th class="r">Trades</th><th class="r">Volume</th></tr></thead>
-              <tbody id="txs"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
-            </table>
+          <div class="kpis">
+            <div><b id="k-vol">—</b><span>24h volume</span></div>
+            <div><b id="k-fee">0.50%</b><span>TradePad fee</span></div>
+            <div><b id="k-pons">—</b><span>Pons fee</span></div>
+          </div>
+          <div class="pair-btns">
+            <button class="btn btn-p" data-goto="buy"><svg><use href="#i-down"/></svg>Buy</button>
+            <button class="btn btn-o" data-goto="sell"><svg><use href="#i-up"/></svg>Sell</button>
           </div>
         </section>
       </div>
@@ -851,6 +904,12 @@ th.r, td.r { text-align: right; }
   <div class="qb-row"><input id="qb-in" inputmode="decimal" autocomplete="off" aria-label="Custom amount in ETH"><span>ETH</span><button class="btn btn-s" id="qb-save">Save</button></div>
   <p class="qb-note">One click fills the trade window and presses Buy. Your wallet still asks you to confirm.</p>
 </div>
+  <nav class="mtab" id="mtab" aria-label="Sections">
+    <button data-mt="disc" class="on"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Discover</button>
+    <button data-mt="radar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 12l5.5-5.5"/></svg>Radar</button>
+    <button data-mt="trade"><svg viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>Trade</button>
+    <button data-mt="wallet"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>Wallet</button>
+  </nav>
 <div class="drawer" id="drawer" hidden>
   <aside class="dr-card glass" aria-label="Menu">
     <div class="dr-top"><b>TradePad</b><button class="icon-btn" id="dr-x" aria-label="Close menu">✕</button></div>
@@ -1282,6 +1341,7 @@ function renderSorts() {
   $("sorts").querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { S.sort[S.src] = b.dataset.sort; renderTable(); });
   $("src").style.setProperty("--i", SRC_I[S.src]);
   $("src").querySelectorAll("[data-src]").forEach(b => b.setAttribute("aria-selected", b.dataset.src === S.src));
+  $("venues").hidden = S.src !== "uni";
 }
 $("src").querySelectorAll("[data-src]").forEach(b => b.onclick = () => {
   if (S.src === b.dataset.src) return;
@@ -2174,6 +2234,7 @@ async function readRouter() {
 }
 function renderRevenue(r) {
   const bars = $("rev-bars"); $("rev-withdraw").hidden = true;
+  const owner = !!(r && !r.error && r.isOwner); $("c-rev").hidden = !owner; $("tab-fee").hidden = !owner;
   if (!r || r.error) {
     $("rev-amt").textContent = "—";
     $("rev-sub").textContent = r?.error ? "Could not read the router. Check the address and make sure your wallet is on Robinhood Chain." : "Add your router address in swap settings to see collected fees.";
@@ -2959,6 +3020,24 @@ function watchQuick(run) {               // mirror the swap card's message into 
 function tmStatus(html, kind) { const el = $("tm-status"); el.hidden = false; el.className = "tm-status " + (kind || ""); el.innerHTML = html; }
 
 // ======================= MENU (narrow screens) =======================
+// phone tab bar: jump between the list, the trade box and the wallet; Radar opens its own sheet
+(() => {
+  const bar = $("mtab"); if (!bar) return;
+  const target = { disc: "c-table", trade: "c-chart", wallet: "c-wallet" };
+  const setOn = (k) => bar.querySelectorAll("[data-mt]").forEach(b => b.classList.toggle("on", b.dataset.mt === k));
+  bar.querySelectorAll("[data-mt]").forEach(b => b.onclick = () => {
+    const k = b.dataset.mt;
+    if (k === "radar") return navGo("radar");
+    if (k === "wallet" && !S.wallet) $("connect").click();
+    $(target[k]).scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); setOn(k);
+  });
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { const k = Object.keys(target).find(x => target[x] === e.target.id); if (k) setOn(k); } }, { rootMargin: "-45% 0px -50% 0px" });
+    ["c-table", "c-chart", "c-swap", "c-wallet"].forEach(id => $(id) && io.observe($(id)));
+    // the swap box counts as "Trade" too
+    const io2 = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) setOn("trade"); }, { rootMargin: "-45% 0px -50% 0px" }); io2.observe($("c-swap"));
+  }
+})();
 const SECTIONS = [["c-pulse", "Market overview"], ["c-chart", "Chart"], ["c-swap", "Trade"], ["c-table", "Tokens · Pons curve"], ["c-trend", "Trending"], ["c-trades", "Buy / sell activity"], ["c-wallet", "Wallet"], ["c-watch", "Watchlist"], ["c-rev", "TradePad fees"]];
 function openDrawer() {
   $("dr-sec").innerHTML = SECTIONS.map(([id, n]) => `<button data-go="${id}">${n}<span>›</span></button>`).join("");
