@@ -408,7 +408,8 @@ body.noscroll { overflow: hidden; }
 .top #proj .ca .full { display: none; } .top #proj .ca .short { display: inline; }
 .top #proj .ca { padding: 5px 10px; font-size: 12.5px; word-break: normal; white-space: nowrap; }
 .top #proj .pb { height: 30px; padding: 0 11px; font-size: 12px; white-space: nowrap; }
-.top #proj .lbl, .top #proj .sp, .top #proj a.pb:not(.buy) { display: none; }
+.top #proj .lbl, .top #proj .sp { display: none; }
+.top #proj:has(.ca) a.pb:not(.buy) { display: none; }
 .top .grow { flex: 1; }
 .top #proj .sym { font-size: 13.5px; } .top #proj .sym .av { width: 22px; height: 22px; }
 /* hero becomes a thin stat bar */
@@ -3031,12 +3032,13 @@ function tmStatus(html, kind) { const el = $("tm-status"); el.hidden = false; el
     if (k === "wallet" && !S.wallet) $("connect").click();
     $(target[k]).scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); setOn(k);
   });
-  if ("IntersectionObserver" in window) {
-    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { const k = Object.keys(target).find(x => target[x] === e.target.id); if (k) setOn(k); } }, { rootMargin: "-45% 0px -50% 0px" });
-    ["c-table", "c-chart", "c-swap", "c-wallet"].forEach(id => $(id) && io.observe($(id)));
-    // the swap box counts as "Trade" too
-    const io2 = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) setOn("trade"); }, { rootMargin: "-45% 0px -50% 0px" }); io2.observe($("c-swap"));
-  }
+  // whichever section sits under the middle of the screen lights up its tab
+  const zones = [["disc", "c-table"], ["trade", "c-chart"], ["trade", "c-swap"], ["wallet", "c-wallet"]];
+  let raf = 0;
+  const sync = () => { raf = 0; if (getComputedStyle(bar).display === "none") return; const mid = innerHeight / 2;
+    for (const [k, id] of zones) { const r = $(id).getBoundingClientRect(); if (r.top <= mid && r.bottom >= mid) return setOn(k); } };
+  addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(sync); }, { passive: true });
+  addEventListener("resize", sync); setTimeout(sync, 1500);
 })();
 const SECTIONS = [["c-pulse", "Market overview"], ["c-chart", "Chart"], ["c-swap", "Trade"], ["c-table", "Tokens · Pons curve"], ["c-trend", "Trending"], ["c-trades", "Buy / sell activity"], ["c-wallet", "Wallet"], ["c-watch", "Watchlist"], ["c-rev", "TradePad fees"]];
 function openDrawer() {
