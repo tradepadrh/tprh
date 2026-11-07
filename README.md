@@ -42,6 +42,9 @@ git push -u origin main
 | `TOKEN_SYMBOL` | no | `TP` | Ticker shown next to the CA (without `$`). |
 | `X_URL` | no | `https://x.com/yourhandle` or `@yourhandle` | Your X account, shown in the top bar. |
 | `TELEGRAM_URL` | no | `https://t.me/yourgroup` | Optional Telegram link in the top bar. |
+| `VERIFIED_TOKENS` | no | `0xAbC…, 0xDeF…` | Tokens the team approved. They get the lime TP badge ("Verified by TradePad"). Comma or space separated. |
+| `VERIFY_TG_BOT_TOKEN` + `VERIFY_TG_CHAT_ID` | for the form | `123456:AA…` / `-100123…` | Where verification requests are sent (a Telegram bot from @BotFather and your team chat id). Secret: keep the token only on Railway. |
+| `VERIFY_DISCORD_WEBHOOK` | for the form | `https://discord.com/api/webhooks/…` | Alternative (or extra) destination for verification requests. Secret. |
 | `PUBLIC_RPC_URL` | no | `https://rpc.mainnet.chain.robinhood.com` | Read-only RPC the browser uses for the Pons curve list. Public URLs only (it is visible to visitors). |
 
 The assets table has a three-way menu: **Pons curve** (Pons v2 launches still on the bonding curve, read
@@ -86,6 +89,13 @@ through the read-only `/rpc` relay and never signs anything.
   launches. Scope: your watchlist + followed creators, or every launch. Saved in the browser.
 - **Wallets**: follow creator wallets, see their launches, and look up the first buyers of any Pons launch (the sender of each of
   the earliest curve buys; the creator and followed wallets are marked).
+
+## Verified by TradePad (requests from projects)
+Pons projects ask for the badge with the form at `https://tradepad.dev/#verify` (also the "Get verified" button above the
+Pons curve list and the link in each token's safety panel). The server checks the request (is it a Pons v2 launch, do the
+website / public Telegram show the CA), then sends it to your Telegram chat (`VERIFY_TG_BOT_TOKEN` + `VERIFY_TG_CHAT_ID`)
+and/or Discord (`VERIFY_DISCORD_WEBHOOK`). Up to 5 requests per visitor per hour. The form only appears once one of those
+is set. To approve a token, add its CA to `VERIFIED_TOKENS`; Railway redeploys and the badge shows everywhere.
 
 ## Safety checks (CA verified, rug flags)
 For Pons tokens the lists show a lime shield when the token's own website or public Telegram channel shows this

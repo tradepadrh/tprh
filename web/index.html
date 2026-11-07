@@ -273,6 +273,22 @@ body.noscroll { overflow: hidden; }
   .rd-row .av { width: 36px; height: 36px; } .rd-acts [data-buyers], .rd-acts [data-trade] { display: none; }
   .rd-buyers { margin-left: 0; } .rd-buyers li { grid-template-columns: 18px minmax(0, 1fr) auto; } .rd-buyers li .b { display: none; }
 }
+/* verification request form */
+.sb.team { background: var(--volt); color: var(--volt-fg); box-shadow: 0 0 10px rgba(204, 255, 4, .45); } .sb.team svg { width: 11px; height: 11px; }
+.vf-card { width: min(560px, 100%); }
+.vf-form { display: grid; gap: 10px; margin-top: 4px; }
+.vf-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.vf-form label b { color: var(--volt); }
+.vf-form input, .vf-form textarea { height: 42px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0, 0, 0, .25); color: var(--fg); padding: 0 12px; font: inherit; font-size: 14px; }
+.vf-form textarea { height: 70px; padding: 10px 12px; resize: vertical; }
+.vf-form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vf-tips { list-style: none; padding: 12px 14px; margin: 0 0 6px; border-radius: 16px; background: var(--volt-soft); border: 1px solid rgba(204, 255, 4, .3); display: grid; gap: 6px; font-size: 12.5px; line-height: 1.45; }
+.vf-tips li { display: flex; gap: 8px; } .vf-tips li::before { content: "✓"; color: var(--volt); font-weight: 900; }
+.vf-res { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; font-size: 13px; }
+.vf-res li { display: flex; gap: 9px; padding: 9px 12px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); }
+.vf-res li i { font-style: normal; font-weight: 900; width: 14px; } .vf-res li.ok i { color: var(--volt); } .vf-res li.warn i { color: var(--warn); }
+.safe .vf-link { display: inline-flex; margin-top: 8px; border: 0; background: none; color: var(--volt); font: inherit; font-size: 12px; font-weight: 700; padding: 0; cursor: pointer; }
+@media (max-width: 520px) { .vf-form .two { grid-template-columns: 1fr; } }
 /* roadmap card */
 .rm { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
 .rm[hidden] { display: none; }
@@ -837,6 +853,25 @@ th.r, td.r { text-align: right; }
     </ul>
   </div>
 </div>
+<div class="rm" id="vf" hidden role="dialog" aria-modal="true" aria-labelledby="vf-t">
+  <div class="rm-card glass vf-card">
+    <button class="icon-btn rm-x" id="vf-x" aria-label="Close">✕</button>
+    <div class="rm-k">For Pons projects</div>
+    <h3 id="vf-t">Get Verified by TradePad</h3>
+    <p class="lead">Send your token and links. The TradePad team reviews every request by hand. Approved tokens get the lime TP badge across TradePad.</p>
+    <ul class="vf-tips"><li>Show your exact CA on your website or in your public Telegram channel. That is the first thing we check.</li><li>Use the official links of the project. We never ask for payment or private keys.</li></ul>
+    <form class="vf-form" id="vf-form" novalidate>
+      <label><span>Token contract address <b>*</b></span><input id="vf-ca" placeholder="0x…" autocomplete="off" spellcheck="false" maxlength="42"></label>
+      <div class="two"><label>Project name<input id="vf-name" maxlength="40" autocomplete="off"></label><label>X<input id="vf-x" placeholder="@handle" maxlength="80" autocomplete="off"></label></div>
+      <div class="two"><label>Website<input id="vf-web" placeholder="yourtoken.xyz" maxlength="200" autocomplete="off"></label><label>Telegram<input id="vf-tg" placeholder="t.me/yourgroup" maxlength="80" autocomplete="off"></label></div>
+      <label><span>How we reach you <b>*</b></span><input id="vf-contact" placeholder="Telegram @handle or email" maxlength="80" autocomplete="off"></label>
+      <label>Anything else<textarea id="vf-note" maxlength="400"></textarea></label>
+      <button class="btn btn-p" id="vf-send" type="submit" style="justify-content:center;height:46px">Send for review</button>
+    </form>
+    <div class="msg" id="vf-msg" hidden></div>
+    <ul class="vf-res" id="vf-res" hidden></ul>
+  </div>
+</div>
 <div class="rm" id="rm" hidden role="dialog" aria-modal="true" aria-labelledby="rm-t">
   <div class="rm-card glass">
     <button class="icon-btn rm-x" id="rm-x" aria-label="Close">✕</button>
@@ -1211,6 +1246,7 @@ function renderSorts() {
   const note = S.src === "curve" ? `<span class="note">newest ${CONFIG.PONS_LAUNCH_ROWS} launches · on-chain</span>` : S.src === "grad" ? `<span class="note">Pons v2 graduates + Pons v1</span>` : "";
   $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note +
     (S.src !== "uni" ? `<span class="sf"><button data-sf="safe" aria-pressed="${S.safeOnly === "safe"}" title="Hide copycats, big dev bags and serial launchers">${SHIELD} Hide risky</button><button data-sf="verified" aria-pressed="${S.safeOnly === "verified"}" title="Only tokens whose website or Telegram shows this contract address">${SHIELD_OK} CA verified</button></span>` : "") +
+    (S.src === "curve" && CONFIG.SUBMIT ? `<button class="qb-set" data-verify title="Pons project? Ask for the Verified by TradePad badge">${SHIELD_OK} Get verified</button>` : "") +
     (S.src === "curve" && phState(3) === "live" ? `<button class="qb-set rd-btn" data-radar title="Live launch feed, curve alerts and wallet tracking"><svg viewBox="0 0 24 24" width="14" height="14"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/></g></svg>Radar</button>` : "") +
     `<button class="qb-set" id="qb-set" title="Amount for one-click buys">${BOLT} Quick buy <b>${esc(S.qb)} ETH</b></button>`;
   $("sorts").querySelectorAll("[data-sf]").forEach(b => b.onclick = () => { S.safeOnly = S.safeOnly === b.dataset.sf ? "" : b.dataset.sf; save("safe", S.safeOnly); renderTable(); });
@@ -1345,6 +1381,8 @@ function wireRows(body, poolOf) {
 //  - Creator tax on trades
 // Pons tokens are standard Pons contracts (fixed supply, no mint), so these are the main rug patterns left.
 const SAFE = {};
+const TEAM = new Set((CONFIG.TEAM_VERIFIED || []).map(a => String(a).toLowerCase()));   // approved by the TradePad team
+const TP_MINI = '<svg viewBox="8 14 160 160"><path fill="currentColor" d="M44 41 H150 C158 41 164.5 47 164.5 55 V61.5 L130.5 115.5 C128.5 118.5 125.5 119.5 122 119.5 H92.5 L76.5 147 H53 L82 101 H115.5 L140 61.5 H32.5 Z"/><path fill="currentColor" d="M25 71 H122 L109.5 91.5 H73.5 L39.5 147 H16.5 L51 91.5 H12.5 Z"/></svg>';
 const SHIELD = '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" d="M12 3l7 3v6c0 4.4-3 7.8-7 9-4-1.2-7-4.6-7-9V6z"/></svg>';
 const SHIELD_OK = '<svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M12 2l8 3.4V12c0 5-3.4 8.8-8 10-4.6-1.2-8-5-8-10V5.4z"/><path d="M8.2 12.2l2.6 2.6 5-5.2" fill="none" stroke="#141A00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const DEV_WARN = 0.10, SERIAL_WARN = 5;
@@ -1361,13 +1399,15 @@ function safetyOf(id) {
   if (s.devPct >= DEV_WARN) flags.push(`Creator wallet holds ${(s.devPct * 100).toFixed(1)}% of supply`);
   if (serial >= SERIAL_WARN) flags.push(`Creator launched ${serial} tokens recently`);
   if (L?.taxBps > 500) flags.push(`Creator tax ${(L.taxBps / 100).toFixed(1)}% per trade`);
-  const verified = (s.web === true || s.tg === true) && !copycat;
-  return { verified, risky: flags.length > 0, flags, s, copycat, serial, L };
+  const team = TEAM.has(id) && !copycat;
+  const verified = (team || s.web === true || s.tg === true) && !copycat;
+  return { verified, team, risky: flags.length > 0, flags, s, copycat, serial, L };
 }
 function safeBadge(id) {
   if (!isPonsId(id)) return "";
   const r = safetyOf(id);
   if (r.risky) return `<span class="sb risk" title="${esc(r.flags.join(" · "))}">!</span>`;
+  if (r.team) return `<span class="sb team" title="Verified by the TradePad team">${TP_MINI}</span>`;
   if (r.verified) return `<span class="sb ok" title="CA verified on the project's ${r.s.web === true ? "website" : ""}${r.s.web === true && r.s.tg === true ? " and " : ""}${r.s.tg === true ? "Telegram" : ""}">${SHIELD_OK}</span>`;
   return "";
 }
@@ -1409,6 +1449,7 @@ function safetyPanel(id) {
   if (!isPonsId(id)) return "";
   const r = safetyOf(id), s = r.s, row = (st, txt) => `<li class="${st}"><i>${st === "ok" ? "✓" : st === "bad" ? "!" : "·"}</i>${txt}</li>`;
   const items = [
+    ...(r.team ? [row("ok", "Verified by the TradePad team")] : []),
     row("ok", "Standard Pons contract: fixed supply, no mint"),
     row(s.web === true ? "ok" : s.web === false ? "warn" : "na", s.web === true ? "Website shows this CA" : s.web === false ? "Website does not show this CA" : SOC[id]?.web ? "Website: not checked yet" : "No website linked"),
     row(s.tg === true ? "ok" : s.tg === false ? "warn" : "na", s.tg === true ? "Telegram channel shows this CA" : s.tg === false ? "Telegram does not show this CA" : SOC[id]?.tg ? "Telegram: not checked yet" : "No public Telegram linked"),
@@ -1417,8 +1458,8 @@ function safetyPanel(id) {
     row(s.devPct == null ? "na" : s.devPct >= DEV_WARN ? "bad" : "ok", s.devPct == null ? "Creator bag: checking…" : `Creator wallet holds ${(s.devPct * 100).toFixed(2)}%`),
     row(r.serial >= SERIAL_WARN ? "bad" : "ok", r.serial ? `Creator launched ${r.serial} token${r.serial > 1 ? "s" : ""} recently` : "Creator history: unknown"),
   ];
-  const head = r.risky ? `<b class="bad">Caution</b>` : r.verified ? `<b class="ok">CA verified</b>` : `<b>Not verified</b>`;
-  return `<details class="safe"${r.risky ? " open" : ""}><summary>${r.verified ? SHIELD_OK : SHIELD} ${head}<span>${r.risky ? r.flags.length + " warning" + (r.flags.length > 1 ? "s" : "") : "safety checks"}</span></summary><ul>${items.join("")}</ul><p>Signals, not guarantees. Always check the CA yourself before buying.</p></details>`;
+  const head = r.risky ? `<b class="bad">Caution</b>` : r.team ? `<b class="ok">Verified by TradePad</b>` : r.verified ? `<b class="ok">CA verified</b>` : `<b>Not verified</b>`;
+  return `<details class="safe"${r.risky ? " open" : ""}><summary>${r.verified ? SHIELD_OK : SHIELD} ${head}<span>${r.risky ? r.flags.length + " warning" + (r.flags.length > 1 ? "s" : "") : "safety checks"}</span></summary><ul>${items.join("")}</ul><p>Signals, not guarantees. Always check the CA yourself before buying.</p>${!r.team && CONFIG.SUBMIT ? `<button class="vf-link" data-verify="${esc(id)}">Is this your token? Get Verified by TradePad ›</button>` : ""}</details>`;
 }
 
 // ======================= PONS INDEX (on-chain) =======================
@@ -2712,6 +2753,48 @@ function wireRadar(body) {
     RD.lookup = a; out.innerHTML = rdBuyersHTML(L); await rdLoadBuyers(L);
   };
 }
+
+// ======================= VERIFIED BY TRADEPAD (requests) =======================
+// Projects send their CA and links; the server checks them and forwards the request to the team.
+// The team approves a token by adding its CA to VERIFIED_TOKENS on Railway.
+function openVerify(ca) {
+  if (!CONFIG.SUBMIT) { showMsg("Verification requests are not open yet.", "err"); return; }
+  closeDrawer(); closePhase(); if (RD.open) closeRadar();
+  $("vf").hidden = false; $("vf-msg").hidden = true; $("vf-res").hidden = true; $("vf-form").hidden = false;
+  if (ca && /^0x[0-9a-fA-F]{40}$/.test(ca)) $("vf-ca").value = ca;
+  setTimeout(() => ($("vf-ca").value ? $("vf-contact") : $("vf-ca")).focus(), 50);
+}
+function closeVerify() { $("vf").hidden = true; if (location.hash === "#verify") history.replaceState(null, "", location.pathname + location.search); }
+$("vf-x").onclick = closeVerify;
+$("vf").addEventListener("click", (e) => { if (e.target === $("vf")) closeVerify(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("vf").hidden) closeVerify(); });
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-verify]"); if (!b) return; e.preventDefault(); e.stopPropagation(); if (!$("tm").hidden) closeTrade(); openVerify(b.dataset.verify); }, true);
+const vfHash = () => { if (location.hash === "#verify") openVerify(); };
+window.addEventListener("hashchange", vfHash); setTimeout(vfHash, 300);
+$("vf-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const m = $("vf-msg"), err = (t) => { m.hidden = false; m.className = "msg err"; m.textContent = t; };
+  const body = { ca: $("vf-ca").value.trim(), name: $("vf-name").value.trim(), x: $("vf-x").value.trim(), website: $("vf-web").value.trim(), telegram: $("vf-tg").value.trim(), contact: $("vf-contact").value.trim(), note: $("vf-note").value.trim() };
+  if (!/^0x[0-9a-fA-F]{40}$/.test(body.ca)) return err("Enter the token's 0x contract address.");
+  if (body.contact.length < 3) return err("Add a Telegram handle or email so we can reach you.");
+  if (!body.website && !body.telegram) return err("Add your website or Telegram so we can check your CA.");
+  const btn = $("vf-send"); btn.disabled = true; btn.textContent = "Checking and sending…"; m.hidden = true;
+  try {
+    const r = await fetch(CONFIG.SUBMIT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) return err(d.error || "Could not send your request. Try again later.");
+    const c = d.checks || {}, li = (ok, t) => `<li class="${ok ? "ok" : "warn"}"><i>${ok ? "✓" : "!"}</i>${t}</li>`;
+    $("vf-form").hidden = true; m.hidden = false; m.className = "msg ok";
+    m.textContent = "Request sent. The TradePad team will review it and contact you.";
+    $("vf-res").innerHTML = [
+      c.pons === true ? li(true, "Pons v2 launch found on Robinhood Chain") : c.pons === false ? li(false, "This address is not a Pons v2 launch. Double-check the CA.") : "",
+      body.website ? (c.web === true ? li(true, "Your website shows this CA") : li(false, c.web === false ? "Your website does not show this CA yet. Add it to speed up the review." : "We could not open your website. We will check it by hand.")) : "",
+      body.telegram ? (c.tg === true ? li(true, "Your Telegram channel shows this CA") : li(false, c.tg === false ? "Your public Telegram does not show this CA yet. Pin it to speed up the review." : "We could not open your Telegram. We will check it by hand.")) : "",
+    ].join("");
+    $("vf-res").hidden = false;
+  } catch { err("Could not reach TradePad. Check your connection and try again."); }
+  finally { btn.disabled = false; btn.textContent = "Send for review"; }
+};
 
 // ======================= QUICK BUY AMOUNT =======================
 const QB_PRESETS = ["0.005", "0.01", "0.025", "0.05", "0.1", "0.25"];

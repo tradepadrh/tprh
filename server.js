@@ -26,6 +26,10 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 //  - /rpc and /verify only answer pages served from that address (other sites can't use your relays)
 //  - browsers are told to always use HTTPS (HSTS)
 //  - the page shows a warning if someone serves a copy of it from another address
+// verification requests go to the team's Telegram chat and/or Discord channel (both optional)
+const VERIFY_TG_BOT = (process.env.VERIFY_TG_BOT_TOKEN || "").trim(), VERIFY_TG_CHAT = (process.env.VERIFY_TG_CHAT_ID || "").trim();
+const VERIFY_DISCORD = /^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[\w-]+$/.test((process.env.VERIFY_DISCORD_WEBHOOK || "").trim()) ? process.env.VERIFY_DISCORD_WEBHOOK.trim() : "";
+const SUBMIT_ON = Boolean((/^\d+:[\w-]{30,}$/.test(VERIFY_TG_BOT) && /^-?\d+$|^@\w+$/.test(VERIFY_TG_CHAT)) || VERIFY_DISCORD);
 let SITE = null;
 try { const u = new URL((process.env.SITE_URL || "").trim()); if (u.protocol === "https:" && !u.username && !u.password) SITE = u; } catch {}
 const hostOf = (req) => String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim().toLowerCase();
@@ -45,6 +49,10 @@ function buildConfig() {
   const phase = Number(process.env.ROADMAP_PHASE);
   cfg.PHASE = Number.isInteger(phase) && phase >= 1 && phase <= 5 ? phase : 3;   // roadmap: phases up to this one are live
   if (SITE) cfg.SITE_URL = SITE.origin;
+  // "Verified by TradePad": tokens the team approved (comma or space separated list on Railway)
+  const team = [...new Set((process.env.VERIFIED_TOKENS || "").split(/[\s,]+/).filter(a => ADDRESS_RE.test(a)).map(a => a.toLowerCase()))].slice(0, 1000);
+  if (team.length) cfg.TEAM_VERIFIED = team;
+  if (SUBMIT_ON) cfg.SUBMIT = "/submit";
   // project info shown at the top of the page: edit these on Railway, no code change needed
   const ca = (process.env.TOKEN_CA || "").trim();
   if (ADDRESS_RE.test(ca)) cfg.TOKEN_CA = ca;
@@ -318,6 +326,80 @@ function verifyRoute(req, res) {
   });
 }
 
+// ---------------------------------------------------------------- verification requests ("Verified by TradePad")
+// A project sends its CA and links with the form on the site. The server runs the automatic checks (is it a Pons launch,
+// do its website / Telegram show the CA) and forwards everything to the team. The team approves a token by adding its
+// CA to VERIFIED_TOKENS on Railway. Nothing here changes on-chain state; requests are rate limited per visitor.
+const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
+const submitHits = new Map(); let submitDay = { d: "", n: 0 };
+const cleanText = (v, n) => typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f<>`]/g, " ").replace(/\s+/g, " ").trim().slice(0, n) : "";
+function cleanUrl(v) {
+  v = cleanText(v, 200); if (!v) return "";
+  if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+  try { const u = new URL(v); return /^https?:$/.test(u.protocol) && u.hostname.includes(".") ? u.href : ""; } catch { return ""; }
+}
+function postJson(url, obj) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify(obj), u = new URL(url);
+    const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: "POST", timeout: 10000, headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } },
+      (up) => { up.resume(); up.on("end", () => resolve(up.statusCode >= 200 && up.statusCode < 300)); });
+    r.on("timeout", () => r.destroy()); r.on("error", () => resolve(false)); r.end(body);
+  });
+}
+async function ponsLaunch(ca) {   // factory.getLaunchedToken(ca): exists, deployer, phase
+  const call = { jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: PONS_FACTORY, data: "0x3cf28b5a" + ca.slice(2).toLowerCase().padStart(64, "0") }, "latest"] };
+  try {
+    const r = await rpcUpstream(JSON.stringify(call)); const out = JSON.parse(r.body.toString("utf8")).result || "";
+    const w = (out.slice(2).match(/.{64}/g) || []); if (w.length < 15) return null;
+    return { exists: BigInt("0x" + w[14]) !== 0n, deployer: "0x" + w[2].slice(24), phase: Number(BigInt("0x" + w[10])) };
+  } catch { return null; }
+}
+function submitRoute(req, res) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now(), day = new Date().toISOString().slice(0, 10);
+  const hits = (submitHits.get(ip) || []).filter(t => now - t < 3600e3);
+  if (hits.length >= 5) return json(res, 429, { error: "Too many requests. Try again in an hour." });
+  if (submitDay.d !== day) submitDay = { d: day, n: 0 };
+  if (submitDay.n >= 300) return json(res, 429, { error: "Requests are paused for today. Try again tomorrow." });
+  const chunks = []; let size = 0;
+  req.on("data", (c) => { size += c.length; if (size > 16 * 1024) req.destroy(); else chunks.push(c); });
+  req.on("end", async () => {
+    let b; try { b = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return json(res, 400, { error: "bad json" }); }
+    const ca = cleanText(b && b.ca, 42).toLowerCase();
+    if (!ADDRESS_RE.test(ca)) return json(res, 400, { error: "Enter the token's 0x contract address." });
+    const contact = cleanText(b.contact, 80);
+    if (contact.length < 3) return json(res, 400, { error: "Add a Telegram handle or email so we can reach you." });
+    const web = cleanUrl(b.website), tgm = cleanText(b.telegram, 80).match(/^(?:https?:\/\/)?(?:t\.me\/|@)?([A-Za-z0-9_]{4,32})\/?$/), tg = tgm ? "https://t.me/" + tgm[1] : "";
+    const xm = cleanText(b.x, 80).match(/^(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})|^@?([A-Za-z0-9_]{1,15})$/i), x = xm ? "@" + (xm[1] || xm[2]) : "";
+    const name = cleanText(b.name, 40), note = cleanText(b.note, 400);
+    hits.push(now); submitHits.set(ip, hits); submitDay.n++;
+    if (submitHits.size > 5000) submitHits.delete(submitHits.keys().next().value);
+    const [pons, onWeb, onTg] = await Promise.all([ponsLaunch(ca), checkSite(ca, web, "web"), checkSite(ca, tg, "tg")]);
+    const yn = (v) => v === true ? "YES" : v === false ? "no" : "could not check";
+    const lines = [
+      "New verification request" + (name ? ": " + name : ""),
+      "CA: " + ca,
+      "Pons launch: " + (pons ? (pons.exists ? `YES (${pons.phase === 0 ? "on the curve" : pons.phase === 2 ? "graduated" : "phase " + pons.phase})` : "NO, not a Pons v2 launch") : "could not check"),
+      pons && pons.exists ? "Creator: " + pons.deployer : "",
+      "Website: " + (web || "none") + (web ? " | CA on page: " + yn(onWeb) : ""),
+      "Telegram: " + (tg || "none") + (tg ? " | CA in channel: " + yn(onTg) : ""),
+      "X: " + (x || "none") + (x ? " (check manually)" : ""),
+      "Contact: " + contact,
+      note ? "Note: " + note : "",
+      "Explorer: https://robinhoodchain.blockscout.com/token/" + ca,
+      "Approve: add this CA to VERIFIED_TOKENS on Railway.",
+    ].filter(Boolean);
+    const text = lines.join("\n");
+    console.log("[verify-request]\n" + text);
+    const sent = await Promise.all([
+      VERIFY_TG_BOT && VERIFY_TG_CHAT ? postJson(`https://api.telegram.org/bot${VERIFY_TG_BOT}/sendMessage`, { chat_id: VERIFY_TG_CHAT, text, disable_web_page_preview: true }) : false,
+      VERIFY_DISCORD ? postJson(VERIFY_DISCORD, { content: text.slice(0, 1900), allowed_mentions: { parse: [] } }) : false,
+    ]);
+    if (!sent.some(Boolean)) return json(res, 502, { error: "We could not deliver your request right now. Try again later." });
+    json(res, 200, { ok: true, checks: { pons: pons ? pons.exists : null, web: web ? onWeb : null, tg: tg ? onTg : null } });
+  });
+}
+
 // ---------------------------------------------------------------- server
 const server = http.createServer((req, res) => {
   // health checks come from Railway itself on its own host name: always answer them
@@ -327,8 +409,9 @@ const server = http.createServer((req, res) => {
     if (req.method !== "GET" && req.method !== "HEAD") return json(res, 403, { error: "use " + SITE.origin });
     return send(res, 301, "", { Location: SITE.origin + (req.url.startsWith("/") ? req.url : "/"), "Cache-Control": "no-store" });
   }
-  if (req.method === "POST" && (req.url === "/rpc" || req.url === "/verify")) {
+  if (req.method === "POST" && (req.url === "/rpc" || req.url === "/verify" || req.url === "/submit")) {
     if (SITE && !sameSite(req.headers.origin || "")) return json(res, 403, { error: "forbidden origin" });
+    if (req.url === "/submit") return SUBMIT_ON ? submitRoute(req, res) : json(res, 503, { error: "Verification requests are not open yet." });
     return req.url === "/rpc" ? rpcRelay(req, res) : verifyRoute(req, res);
   }
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method Not Allowed", { Allow: "GET, HEAD, POST" });
