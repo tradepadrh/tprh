@@ -199,6 +199,80 @@ body.noscroll { overflow: hidden; }
 .wm-safe li { display: flex; gap: 9px; font-size: 12px; color: var(--muted); line-height: 1.45; }
 .wm-safe li::before { content: "✓"; color: var(--volt); font-weight: 800; }
 #wm-msg { margin-top: 10px; }
+/* ---- radar */
+.rd { position: fixed; inset: 0; z-index: 54; display: grid; place-items: center; padding: 18px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
+.rd[hidden] { display: none; }
+.rd-card { width: min(1080px, 100%); height: min(860px, calc(100dvh - 36px)); display: grid; grid-template-rows: auto auto 1fr; border-radius: 30px; padding: 18px; background: rgba(32, 28, 23, .95); gap: 14px; overflow: hidden; }
+.rd-top { display: flex; align-items: center; gap: 14px; }
+.rd-scope { position: relative; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid rgba(204, 255, 4, .5); background: radial-gradient(circle, rgba(204, 255, 4, .12), transparent 70%); overflow: hidden; flex: none; }
+.rd-scope::before { content: ""; position: absolute; inset: 0; background: conic-gradient(from 0deg, rgba(204, 255, 4, .65), transparent 70deg, transparent); animation: rdspin 2.6s linear infinite; }
+.rd-scope::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--volt); box-shadow: 0 0 10px var(--volt); }
+@keyframes rdspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rd-scope::before { animation: none; } }
+.rd-title b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; display: block; }
+.rd-title span { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.rd-title span i { width: 7px; height: 7px; border-radius: 50%; background: var(--volt); box-shadow: 0 0 0 4px rgba(204, 255, 4, .18); }
+.rd-top .icon-btn { margin-left: auto; }
+.rd-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.rd-tabs button { border: 1px solid var(--line); background: var(--soft); color: var(--muted); border-radius: 99px; padding: 8px 15px; font-weight: 700; font-size: 13px; display: inline-flex; gap: 7px; align-items: center; }
+.rd-tabs button[aria-selected="true"] { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); }
+.rd-tabs button em { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: rgba(0, 0, 0, .25); }
+.rd-body { overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: 8px; padding-right: 2px; }
+.rd-note { font-size: 12px; color: var(--muted); padding: 2px 4px 6px; }
+.rd-empty { padding: 50px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+.rd-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 150px 96px auto; gap: 14px; align-items: center; padding: 10px 14px; border-radius: 18px; background: var(--soft); border: 1px solid var(--line); cursor: pointer; transition: border-color .2s; }
+.rd-row:hover { border-color: rgba(204, 255, 4, .35); }
+.rd-row.fresh { border-color: rgba(204, 255, 4, .55); background: linear-gradient(90deg, rgba(204, 255, 4, .1), var(--soft) 60%); }
+.rd-row .av { width: 40px; height: 40px; font-size: 12px; }
+.rd-main { min-width: 0; }
+.rd-main .l1 { display: flex; align-items: center; gap: 7px; min-width: 0; } .rd-main .l1 b { font-size: 15px; }
+.rd-main .l1 .muted { font-size: 12px; margin-left: 2px; white-space: nowrap; }
+.rd-main .l2 { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 3px; min-width: 0; }
+.rd-main .l2 .ellip { max-width: 180px; }
+.rd-new { font-size: 10px; font-weight: 800; letter-spacing: .12em; padding: 2px 7px; border-radius: 99px; background: var(--volt); color: var(--volt-fg); }
+.rd-dev { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; font-family: inherit; }
+.rd-dev:hover { color: var(--fg); border-color: rgba(204, 255, 4, .4); } .rd-dev.on { color: var(--warn); border-color: rgba(244, 201, 124, .5); }
+.rd-mc b { display: block; font-size: 14px; font-weight: 600; } .rd-mc span { font-size: 11px; color: var(--muted); }
+.rd-mc b.up { color: var(--volt); }
+.rd-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.rd-tag { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--volt); }
+.rd-prog .gm .bar { width: 84px; }
+.rd-buyers { margin: -2px 0 4px 54px; padding: 12px 14px; border-radius: 16px; background: rgba(0, 0, 0, .2); border: 1px dashed var(--line); font-size: 12.5px; }
+.rd-buyers ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.rd-buyers li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
+.rd-buyers li .n { color: var(--faint); font-weight: 800; } .rd-buyers a { color: var(--fg); text-decoration: none; font-family: ui-monospace, monospace; } .rd-buyers a:hover { color: var(--volt); }
+.rd-buyers .t { font-size: 10px; font-weight: 800; letter-spacing: .1em; padding: 1px 6px; border-radius: 99px; margin-left: 6px; background: rgba(244, 201, 124, .15); color: var(--warn); }
+.rd-buyers .t.f { background: var(--volt-soft); color: var(--volt); }
+.rd-buyers .muted { color: var(--muted); }
+.rd-sec { padding: 16px; border-radius: 20px; background: var(--soft); border: 1px solid var(--line); display: grid; gap: 12px; }
+.rd-sec h4 { margin: 0; font-size: 14px; font-weight: 700; } .rd-sec p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.rd-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.rd-toggles button { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 99px; padding: 9px 14px; font-weight: 700; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; font-family: inherit; }
+.rd-toggles button::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; }
+.rd-toggles button[aria-pressed="true"] { color: var(--fg); border-color: rgba(204, 255, 4, .55); background: var(--volt-soft); }
+.rd-toggles button[aria-pressed="true"]::before { background: var(--volt); border-color: var(--volt); box-shadow: 0 0 8px var(--volt); }
+.rd-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.rd-form input { flex: 1 1 220px; min-width: 0; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0, 0, 0, .25); color: var(--fg); padding: 0 12px; font: inherit; font-size: 13px; }
+.rd-form input.sm { flex: 0 1 150px; }
+.rd-list { display: grid; gap: 6px; }
+.rd-w { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgba(0, 0, 0, .18); border: 1px solid var(--line); font-size: 13px; }
+.rd-w b { display: block; } .rd-w small { color: var(--muted); font-size: 11.5px; font-family: ui-monospace, monospace; }
+.rd-w .x { color: var(--muted); }
+.rd-log { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 12px; background: rgba(0, 0, 0, .18); font-size: 13px; cursor: pointer; }
+.rd-log time { color: var(--faint); font-size: 11.5px; } .rd-log b { color: var(--volt); }
+.rd-toasts { position: fixed; right: 16px; bottom: 16px; z-index: 70; display: grid; gap: 8px; width: min(340px, calc(100vw - 32px)); }
+.rd-toast { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 18px; background: rgba(28, 25, 21, .97); border: 1px solid rgba(204, 255, 4, .45); box-shadow: 0 18px 40px rgba(0, 0, 0, .55), 0 0 30px rgba(204, 255, 4, .12); cursor: pointer; font-size: 13px; animation: rdin .35s ease-out; }
+.rd-toast .av { width: 34px; height: 34px; font-size: 11px; flex: none; }
+.rd-toast b { display: block; font-size: 14px; } .rd-toast span { color: var(--muted); }
+.rd-toast .k { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: .14em; color: var(--volt); align-self: flex-start; }
+@keyframes rdin { from { transform: translateY(14px); opacity: 0; } }
+@media (max-width: 760px) {
+  .rd { padding: 0; } .rd-card { height: 100dvh; border-radius: 0; padding: 14px; }
+  .rd-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .rd-tabs button { flex: none; }
+  .rd-row { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; } .rd-row .rd-prog, .rd-row .rd-mc { display: none; }
+  .rd-row .av { width: 36px; height: 36px; } .rd-acts [data-buyers], .rd-acts [data-trade] { display: none; }
+  .rd-buyers { margin-left: 0; } .rd-buyers li { grid-template-columns: 18px minmax(0, 1fr) auto; } .rd-buyers li .b { display: none; }
+}
 /* roadmap card */
 .rm { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(10, 8, 6, .55); backdrop-filter: blur(6px); }
 .rm[hidden] { display: none; }
@@ -717,6 +791,16 @@ th.r, td.r { text-align: right; }
     </div>
   </div>
 </div>
+<div class="rd" id="rd" hidden role="dialog" aria-modal="true" aria-labelledby="rd-t">
+  <div class="rd-card glass">
+    <div class="rd-top"><div class="rd-scope" aria-hidden="true"></div><div class="rd-title"><b id="rd-t">Radar</b><span><i></i><span id="rd-blk">Scanning the Pons factory…</span></span></div><button class="icon-btn" id="rd-x" aria-label="Close">✕</button></div>
+    <div class="rd-tabs" role="tablist" id="rd-tabs">
+      <button role="tab" data-rt="feed">Live feed</button><button role="tab" data-rt="moving">Moving curves</button><button role="tab" data-rt="alerts">Alerts</button><button role="tab" data-rt="wallets">Wallets</button>
+    </div>
+    <div class="rd-body" id="rd-body"></div>
+  </div>
+</div>
+<div class="rd-toasts" id="rd-toasts" aria-live="polite"></div>
 <div class="qbpop glass" id="qbpop" hidden role="dialog" aria-label="Quick buy amount">
   <div class="rm-k" style="font-size:10px">Quick buy amount</div>
   <div class="qb-presets" id="qb-presets"></div>
@@ -1127,6 +1211,7 @@ function renderSorts() {
   const note = S.src === "curve" ? `<span class="note">newest ${CONFIG.PONS_LAUNCH_ROWS} launches · on-chain</span>` : S.src === "grad" ? `<span class="note">Pons v2 graduates + Pons v1</span>` : "";
   $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note +
     (S.src !== "uni" ? `<span class="sf"><button data-sf="safe" aria-pressed="${S.safeOnly === "safe"}" title="Hide copycats, big dev bags and serial launchers">${SHIELD} Hide risky</button><button data-sf="verified" aria-pressed="${S.safeOnly === "verified"}" title="Only tokens whose website or Telegram shows this contract address">${SHIELD_OK} CA verified</button></span>` : "") +
+    (S.src === "curve" && phState(3) === "live" ? `<button class="qb-set rd-btn" data-radar title="Live launch feed, curve alerts and wallet tracking"><svg viewBox="0 0 24 24" width="14" height="14"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/></g></svg>Radar</button>` : "") +
     `<button class="qb-set" id="qb-set" title="Amount for one-click buys">${BOLT} Quick buy <b>${esc(S.qb)} ETH</b></button>`;
   $("sorts").querySelectorAll("[data-sf]").forEach(b => b.onclick = () => { S.safeOnly = S.safeOnly === b.dataset.sf ? "" : b.dataset.sf; save("safe", S.safeOnly); renderTable(); });
   $("qb-set").onclick = (e) => { e.stopPropagation(); openQbPop($("qb-set")); };
@@ -1315,7 +1400,7 @@ async function runSafety() {
       }
     }
     ids.forEach(id => { if (SAFE[id]) SAFE[id].pending = false; });
-    renderTable(); if (!$("tm").hidden) renderTmHead();
+    renderTable(); if (!$("tm").hidden) renderTmHead(); if (RD.open) renderRadar();
   } catch {} finally { safeBusy = false; }
 }
 new MutationObserver(() => queueSafety()).observe(document.body, { childList: true, subtree: true });
@@ -2333,14 +2418,14 @@ const PHASES = [
     feats: ["Pons curve, graduated and Uniswap tokens sorted on-chain", "Live candles and buy/sell activity from the very first curve trade", "Swaps routed through the TradePad router with an on-chain price check"] },
   { n: 2, name: "Token", title: "The TradePad token", lead: "Our token is live on the Pons bonding curve. The official contract address is shown in the bar at the top of this page.",
     feats: ["Launched on Pons, Robinhood Chain", "Dev holds 0%: the dev supply is burned", "Official CA only on tradepad.dev and our official X"] },
-  { n: 3, name: "Launch", title: "Launch from TradePad", lead: "Start a Pons launch from the TradePad interface and share a live page for it.",
-    feats: ["Create a Pons launch with name, ticker and image", "A shareable launch page with the live curve and chart", "Launch stats for creators: holders, volume, graduation progress"] },
-  { n: 4, name: "Radar", title: "Catch launches early", lead: "A live feed of new Pons launches and the curves that are moving, so you see them before everyone else.",
+  { n: 3, name: "Radar", title: "Catch launches early", lead: "A live feed of new Pons launches and the curves that are moving, so you see them before everyone else.",
     feats: ["Real-time feed of new Pons launches", "Alerts when a curve passes 50%, 80% and graduation", "Follow creator wallets and see the first buyers of a launch"] },
+  { n: 4, name: "Launch", title: "Launch from TradePad", lead: "Start a Pons launch from the TradePad interface and share a live page for it.",
+    feats: ["Create a Pons launch with name, ticker and image", "A shareable launch page with the live curve and chart", "Launch stats for creators: holders, volume, graduation progress"] },
   { n: 5, name: "Portfolio", title: "Every bag, one view", lead: "Your Pons positions across the curve and Uniswap, with profit and loss per token.",
     feats: ["All your Pons tokens in one wallet view", "Entry price, PnL and value per token", "Graduation watch for the curves you hold"] },
 ];
-const LIVE_PHASE = Math.max(1, Math.min(PHASES.length, Number(CONFIG.PHASE) || 1));
+const LIVE_PHASE = Math.max(1, Math.min(PHASES.length, Number(CONFIG.PHASE) || 3));
 const phState = (n) => n <= LIVE_PHASE ? "live" : n === LIVE_PHASE + 1 ? "next" : "soon";
 const LOCK = '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></g></svg>';
 function renderRoad() {
@@ -2357,6 +2442,7 @@ function renderRoad() {
 }
 function openPhase(n) {
   const p = PHASES[n - 1], s = phState(n);
+  if (p.name === "Radar" && s === "live") return openRadar();   // a live tool opens itself, not its roadmap card
   $("rm-k").textContent = `Phase ${String(n).padStart(2, "0")} · ${s === "live" ? "Live" : s === "next" ? "Up next" : "On the roadmap"}`;
   $("rm-t").textContent = p.title; $("rm-l").textContent = p.lead;
   $("rm-f").innerHTML = p.feats.map(f => `<li>${esc(f)}</li>`).join("");
@@ -2415,6 +2501,217 @@ renderProject();
   bar.innerHTML = `This is not the official TradePad address. Do not connect your wallet here. Official site: <a href="${esc(site)}">${esc(host)}</a>`;
   document.body.prepend(bar);
 })();
+
+// ======================= RADAR =======================
+// Live feed of new Pons launches, curve alerts (50% / 80% / graduation) and wallet tracking.
+// Everything is read from the chain through the read-only relay. Radar never signs or sends anything.
+const RD_DEF = { a50: false, a80: true, grad: true, newFollow: true, scope: "watch", push: false };
+const RD = { open: false, tab: load("rdtab") || "feed", seen: new Set(), gradSeen: null, fresh: new Set(), hist: {}, last: {}, log: [], busy: false, started: 0, lastTick: 0, openBuyers: null, buyers: {},
+  prefs: (() => { try { return { ...RD_DEF, ...JSON.parse(load("rdprefs") || "{}") }; } catch { return { ...RD_DEF }; } })(),
+  follow: (() => { try { const f = JSON.parse(load("rdfollow") || "{}"); return f && typeof f === "object" ? f : {}; } catch { return {}; } })() };
+const rdSave = () => { save("rdprefs", JSON.stringify(RD.prefs)); save("rdfollow", JSON.stringify(RD.follow)); };
+const rdOn = () => !!CONFIG.PONS_FACTORY && !S.sample;
+const rdAlertsOn = () => RD.prefs.a50 || RD.prefs.a80 || RD.prefs.grad || (RD.prefs.newFollow && Object.keys(RD.follow).length);
+const rdInScope = (L) => RD.prefs.scope === "all" || S.stars.has(L.id) || (L.deployer && RD.follow[L.deployer]);
+const rdLabel = (a) => RD.follow[a] || short(a);
+function openRadar() {
+  if (!rdOn()) { showMsg("Radar needs the live chain connection.", "err"); return; }
+  closePhase(); closeDrawer(); RD.open = true; $("rd").hidden = false; document.body.classList.add("noscroll");
+  renderRadar(true); radarTick(true);
+  if (window.gsap && !REDUCED) gsap.fromTo(".rd-card", { y: 30, opacity: .001 }, { y: 0, opacity: 1, duration: .35, ease: "power3.out" });
+}
+function closeRadar() { if (!RD.open) return; RD.open = false; $("rd").hidden = true; RD.fresh.clear(); if ($("tm").hidden) document.body.classList.remove("noscroll"); }
+$("rd-x").onclick = closeRadar;
+$("rd").addEventListener("click", (e) => { if (e.target === $("rd")) closeRadar(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && RD.open) closeRadar(); });
+$("rd-tabs").querySelectorAll("[data-rt]").forEach(b => b.onclick = () => { RD.tab = b.dataset.rt; save("rdtab", RD.tab); renderRadar(true); });
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-radar]"); if (b) { e.preventDefault(); openRadar(); } });
+
+// one scan: newest launches, curve progress, graduations. Alerts fire when a level is crossed between two scans.
+async function radarTick(force) {
+  if (!rdOn() || RD.busy || document.hidden) return;
+  if (!force && !RD.open && !(rdAlertsOn() && Date.now() - RD.lastTick > 20000)) return;
+  RD.busy = true; RD.lastTick = Date.now();
+  try {
+    await loadPons(true);
+    const now = Date.now(), first = !RD.started, list = PONS.launches.slice(0, CONFIG.PONS_LAUNCH_ROWS);
+    if (first) { RD.started = now; list.forEach(L => RD.seen.add(L.id)); RD.gradSeen = new Set(PONS.grad); }
+    for (const L of list) {
+      if (!RD.seen.has(L.id)) { RD.seen.add(L.id); RD.fresh.add(L.id); if (L.deployer && RD.follow[L.deployer]) rdAlert(L, "newFollow", `New launch from ${rdLabel(L.deployer)}`, true); }
+      if (L.phase !== 0 || !isFinite(L.progress)) continue;
+      const h = RD.hist[L.id] || (RD.hist[L.id] = []); h.push([now, L.progress]); while (h.length > 2 && now - h[0][0] > 30 * 60e3) h.shift();
+      const prev = RD.last[L.id]; RD.last[L.id] = L.progress;
+      if (prev == null) continue;                                     // first sight: levels already passed do not alert
+      if (prev < .5 && L.progress >= .5) rdAlert(L, "a50", "passed 50% to graduation");
+      if (prev < .8 && L.progress >= .8) rdAlert(L, "a80", "passed 80% to graduation");
+    }
+    if (!first) for (const id of PONS.grad) if (!RD.gradSeen.has(id)) { RD.gradSeen.add(id); rdAlert(PONS.byId[id] || { id, symbol: S.tokens[id]?.symbol }, "grad", "graduated to Uniswap"); }
+    if (RD.open && (RD.tab === "feed" || RD.tab === "moving")) renderRadar();
+    else if (RD.open) $("rd-blk").textContent = rdBlk();
+  } catch { if (RD.open) $("rd-blk").textContent = "Chain unreachable, retrying…"; }
+  finally { RD.busy = false; }
+}
+setInterval(() => radarTick(false), 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && RD.open) radarTick(true); });
+// first scan in the background when alerts are on, so the next scan can compare
+setTimeout(() => { if (rdOn() && rdAlertsOn()) radarTick(true); }, 6000);
+
+function rdAlert(L, kind, text, any) {
+  if (!RD.prefs[kind]) return;
+  if (!any && !rdInScope(L)) return;
+  const sym = L.symbol || "Token", item = { t: Date.now(), id: L.id, sym, text, kind };
+  RD.log.unshift(item); RD.log.length = Math.min(RD.log.length, 60);
+  const el = document.createElement("div"); el.className = "rd-toast"; el.setAttribute("role", "status");
+  el.innerHTML = `${avHTML(sym, L.id)}<div><b>${esc(sym)}</b><span>${esc(text)}</span></div><span class="k">RADAR</span>`;
+  el.onclick = () => { el.remove(); rdTrade(L.id); };
+  $("rd-toasts").prepend(el); while ($("rd-toasts").children.length > 4) $("rd-toasts").lastChild.remove();
+  setTimeout(() => el.remove(), 9000);
+  if (RD.prefs.push && "Notification" in window && Notification.permission === "granted") {
+    try { const n = new Notification(`TradePad Radar · ${sym}`, { body: text, icon: "/tp-mark.svg", tag: L.id + kind }); n.onclick = () => { window.focus(); rdTrade(L.id); n.close(); }; } catch {}
+  }
+  if (RD.open && RD.tab === "alerts") renderRadar(true);
+}
+function rdTrade(id, quick) {
+  const L = PONS.byId[id]; closeRadar();
+  if (L && L.phase === 0 && isFinite(L.priceQ)) { const pool = curvePool(L); return quick ? quickBuy(pool) : openTrade(pool); }
+  openProjectTrade(id);
+}
+const rdBlk = () => PONS.head ? `Live · block ${PONS.head.block.toLocaleString("en-US")} · ${PONS.launches.length} launches tracked` : "Scanning the Pons factory…";
+function rdGm(L) { const pct = Math.min(100, (L.progress || 0) * 100); return `<span class="gm${pct >= 80 ? " hot" : ""}"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct < 10 ? pct.toFixed(1) : pct.toFixed(0)}%</span></span>`; }
+function rdRow(L, stat) {
+  const cur = L.phase === 0, fol = L.deployer && RD.follow[L.deployer];
+  return `<div class="rd-row${RD.fresh.has(L.id) ? " fresh" : ""}" data-id="${esc(L.id)}">${avHTML(L.symbol || "?", L.id)}
+    <div class="rd-main"><div class="l1"><b>${esc(L.symbol || "…")}</b>${safeBadge(L.id)}${RD.fresh.has(L.id) ? `<span class="rd-new">NEW</span>` : ""}<span class="muted">${ago(blockTime(L.block))}</span></div>
+      <div class="l2"><span class="ellip">${esc(L.name || "")}</span>${L.deployer && L.deployer !== ZERO ? `<button class="rd-dev${fol ? " on" : ""}" data-follow="${esc(L.deployer)}" title="${fol ? "Unfollow" : "Follow"} this creator wallet">${fol ? "★ " + esc(fol) : "☆ creator " + esc(short(L.deployer))}</button>` : ""}</div></div>
+    <div class="rd-prog">${cur ? rdGm(L) : L.phase === 2 ? `<span class="rd-tag">GRADUATED</span>` : ""}</div>
+    <div class="rd-mc">${stat || `<b>${L.mcap > 0 ? fmtUsd(L.mcap) : "—"}</b><span>mkt cap</span>`}</div>
+    <div class="rd-acts"><button class="btn btn-s" data-buyers aria-expanded="${RD.openBuyers === L.id}">First buyers</button>${cur ? `<button class="qb" data-qb title="Quick buy ${esc(S.qb)} ETH">${BOLT}<span>${esc(S.qb)}</span></button>` : ""}<button class="btn btn-s" data-trade>Trade</button></div>
+  </div>${RD.openBuyers === L.id ? rdBuyersHTML(L) : ""}`;
+}
+function rdFeed() {
+  const rows = PONS.launches.slice(0, 60).filter(L => L.phase != null && L.phase >= 0 && L.symbol != null && safeFilterOk(L.id));
+  return `<div class="rd-note">Every new Pons launch, newest first. New ones light up as they hit the chain. Refreshes every 10 seconds.</div>` +
+    (rows.length ? rows.map(L => rdRow(L)).join("") : `<div class="rd-empty">No launches yet.</div>`);
+}
+function rdMoving() {
+  const now = Date.now(), win = 10 * 60e3;
+  const live = PONS.launches.slice(0, CONFIG.PONS_LAUNCH_ROWS).filter(L => L.phase === 0 && isFinite(L.progress) && L.symbol != null && safeFilterOk(L.id)).map(L => {
+    const h = RD.hist[L.id] || []; const base = h.find(([t]) => now - t <= win) || h[0];
+    return { L, d: base ? L.progress - base[1] : 0, span: base ? now - base[0] : 0 };
+  });
+  const moving = live.some(x => x.d > 0.0005);
+  live.sort((a, b) => moving ? b.d - a.d || b.L.progress - a.L.progress : b.L.progress - a.L.progress);
+  const mins = (ms) => Math.max(1, Math.round(ms / 60e3));
+  return `<div class="rd-note">${moving ? "Curves gaining the most since Radar started watching (up to the last 10 minutes)." : "Watching for movement. Until a curve moves, the closest to graduation are on top."}</div>` +
+    live.slice(0, 30).map(({ L, d, span }) => rdRow(L, d > 0.0005 ? `<b class="up">+${(d * 100).toFixed(1)}%</b><span>in ${mins(span)}m</span>` : null)).join("");
+}
+function rdAlertsTab() {
+  const P = RD.prefs, perm = "Notification" in window ? Notification.permission : "unsupported";
+  const tg = (k, l) => `<button data-pref="${k}" aria-pressed="${!!P[k]}">${l}</button>`;
+  return `<div class="rd-sec"><h4>Alert me when</h4><div class="rd-toggles">${tg("a50", "A curve passes 50%")}${tg("a80", "A curve passes 80%")}${tg("grad", "A token graduates")}${tg("newFollow", "A followed wallet launches")}</div>
+      <h4>For</h4><div class="rd-toggles"><button data-scope="watch" aria-pressed="${P.scope === "watch"}">My watchlist + followed creators</button><button data-scope="all" aria-pressed="${P.scope === "all"}">Every Pons launch</button></div>
+      <p>Alerts show here and as a pop-up while TradePad is open in a tab. Settings stay in this browser.</p>
+      <div class="rd-toggles">${perm === "unsupported" ? `<button disabled>Browser notifications not supported</button>` : perm === "denied" ? `<button disabled>Notifications are blocked in this browser's site settings</button>` : `<button data-push aria-pressed="${P.push && perm === "granted"}">Browser notifications</button>`}</div></div>
+    <div class="rd-sec"><h4>Recent alerts</h4>${RD.log.length ? `<div class="rd-list">${RD.log.map(a => `<div class="rd-log" data-go="${esc(a.id)}"><time>${new Date(a.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><span><b>${esc(a.sym)}</b> ${esc(a.text)}</span><span class="muted">Trade ›</span></div>`).join("")}</div>` : `<p>Nothing yet. Alerts appear here as soon as a curve crosses a level you picked.</p>`}</div>`;
+}
+function rdWalletsTab() {
+  const f = Object.entries(RD.follow);
+  const launchesBy = (a) => PONS.launches.filter(L => L.deployer === a);
+  const fromFollowed = PONS.launches.filter(L => L.deployer && RD.follow[L.deployer] && L.symbol != null).slice(0, 20);
+  return `<div class="rd-sec"><h4>Follow a wallet</h4><p>Follow creator wallets to get an alert the moment they launch. Use ☆ next to any creator in the feed, or paste an address.</p>
+      <form class="rd-form" id="rd-fform"><input id="rd-faddr" placeholder="0x… wallet address" autocomplete="off" spellcheck="false"><input class="sm" id="rd-flabel" placeholder="Label (optional)" maxlength="24" autocomplete="off"><button class="btn" type="submit">Follow</button></form>
+      <div class="msg" id="rd-fmsg" hidden></div>
+      ${f.length ? `<div class="rd-list">${f.map(([a, lab]) => { const ls = launchesBy(a); return `<div class="rd-w"><div><b>${esc(lab)}</b><small>${esc(a)}</small></div><span class="muted">${ls.length ? `${ls.length} launch${ls.length > 1 ? "es" : ""} · last ${esc(ls[0].symbol || "…")} ${ago(blockTime(ls[0].block))}` : "no recent launches"}</span><button class="btn btn-s x" data-unfollow="${esc(a)}">Unfollow</button></div>`; }).join("")}</div>` : ""}</div>
+    ${fromFollowed.length ? `<div class="rd-note">Launches from wallets you follow</div>${fromFollowed.map(L => rdRow(L)).join("")}` : ""}
+    <div class="rd-sec"><h4>First buyers of a launch</h4><p>Paste a Pons token address to see the first wallets that bought it on the curve. The creator and wallets you follow are marked.</p>
+      <form class="rd-form" id="rd-bform"><input id="rd-bca" placeholder="0x… Pons token address" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Look up</button></form>
+      <div id="rd-bout">${RD.lookup && PONS.byId[RD.lookup] ? rdBuyersHTML(PONS.byId[RD.lookup]) : ""}</div></div>`;
+}
+function rdBuyersHTML(L) {
+  const b = RD.buyers[L.id];
+  if (!b || b.loading) return `<div class="rd-buyers">Reading the first buys of ${esc(L.symbol || "this launch")}…</div>`;
+  if (b.error) return `<div class="rd-buyers">Could not read the buys right now. Try again in a moment.</div>`;
+  if (!b.list.length) return `<div class="rd-buyers">No buys on the curve yet.</div>`;
+  const ex = CONFIG.EXPLORER;
+  return `<div class="rd-buyers"><ol>${b.list.map((x, i) => `<li><span class="n">${i + 1}</span><span><a href="${ex}/address/${esc(x.who)}" target="_blank" rel="noopener noreferrer">${esc(short(x.who))}</a>${x.who === L.deployer ? `<span class="t">CREATOR</span>` : ""}${RD.follow[x.who] ? `<span class="t f">${esc(RD.follow[x.who])}</span>` : ""}</span><span>${fmtNum(x.q, 4)} ${esc(L.pairSym || "ETH")}</span><span class="muted b">${x.dt != null ? `+${x.dt}s` : ""}</span></li>`).join("")}</ol></div>`;
+}
+// first buyers: earliest Buy events on the curve; the wallet is the sender of each transaction
+async function rdLoadBuyers(L) {
+  if (RD.buyers[L.id] && !RD.buyers[L.id].error) return;
+  RD.buyers[L.id] = { loading: true };
+  try {
+    if (!L.curve || L.dec == null) await readLaunchState([L]);
+    if (!L.curve) throw new Error("not a Pons launch");
+    const latest = await rpc().getBlockNumber();
+    const logs = (await addrLogs(L.curve, [CURVE_BUY], L.block, Math.min(latest, L.block + 600000), 600000)).sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index).slice(0, 30);
+    const txs = await Promise.all(logs.map(l => rpc().getTransaction(l.transactionHash).catch(() => null)));
+    const list = [], seen = new Set(), spb = PONS.head?.spb || 0.1;
+    logs.forEach((l, i) => {
+      const who = lc(txs[i]?.from || (l.topics.length > 1 ? topicAddr(l.topics[l.topics.length - 1]) : ""));
+      if (!who || seen.has(who) || list.length >= 10) return; seen.add(who);
+      const w = (l.data.slice(2).match(/.{64}/g) || []).map(x => BigInt("0x" + x));
+      list.push({ who, q: w[0] != null ? Number(ethers.formatUnits(w[0], L.qDec || 18)) : NaN, dt: Math.round((l.blockNumber - L.block) * spb) });
+    });
+    RD.buyers[L.id] = { list };
+  } catch { RD.buyers[L.id] = { error: true }; }
+  renderRadar(true);
+}
+function rdToggleFollow(a) {
+  a = lc(a); if (!ethers.isAddress(a)) return;
+  if (RD.follow[a]) delete RD.follow[a]; else RD.follow[a] = "Creator " + short(a);
+  rdSave(); renderRadar(true);
+}
+function renderRadar(full) {
+  if (!RD.open) return;
+  $("rd-blk").textContent = rdBlk();
+  $("rd-tabs").querySelectorAll("[data-rt]").forEach(b => { b.setAttribute("aria-selected", b.dataset.rt === RD.tab); if (b.dataset.rt === "alerts") b.innerHTML = `Alerts${RD.log.length ? `<em>${RD.log.length}</em>` : ""}`; if (b.dataset.rt === "wallets") { const n = Object.keys(RD.follow).length; b.innerHTML = `Wallets${n ? `<em>${n}</em>` : ""}`; } });
+  const body = $("rd-body");
+  if (!full && (RD.tab === "alerts" || RD.tab === "wallets")) return;     // forms: never redraw under the user's typing
+  if (!PONS.ready) { body.innerHTML = `<div class="rd-empty">${PONS.error ? "The chain could not be reached. Retrying…" : "Scanning the Pons factory…"}</div>`; return; }
+  const top = body.scrollTop;
+  body.innerHTML = RD.tab === "moving" ? rdMoving() : RD.tab === "alerts" ? rdAlertsTab() : RD.tab === "wallets" ? rdWalletsTab() : rdFeed();
+  body.scrollTop = top; wireRadar(body);
+}
+function wireRadar(body) {
+  body.querySelectorAll(".rd-row").forEach(r => {
+    const id = r.dataset.id;
+    r.onclick = (e) => {
+      const t = e.target;
+      if (t.closest("a")) return;
+      const fb = t.closest("[data-follow]"); if (fb) { e.stopPropagation(); rdToggleFollow(fb.dataset.follow); return; }
+      if (t.closest("[data-buyers]")) { e.stopPropagation(); RD.openBuyers = RD.openBuyers === id ? null : id; renderRadar(true); if (RD.openBuyers) rdLoadBuyers(PONS.byId[id]); return; }
+      if (t.closest("[data-qb]")) { e.stopPropagation(); rdTrade(id, true); return; }
+      rdTrade(id);
+    };
+  });
+  body.querySelectorAll("[data-go]").forEach(x => x.onclick = () => rdTrade(x.dataset.go));
+  body.querySelectorAll("[data-pref]").forEach(b => b.onclick = () => { RD.prefs[b.dataset.pref] = !RD.prefs[b.dataset.pref]; rdSave(); renderRadar(true); });
+  body.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { RD.prefs.scope = b.dataset.scope; rdSave(); renderRadar(true); });
+  const push = body.querySelector("[data-push]");
+  if (push) push.onclick = async () => {
+    if (RD.prefs.push && Notification.permission === "granted") { RD.prefs.push = false; rdSave(); renderRadar(true); return; }
+    let perm = Notification.permission; if (perm === "default") { try { perm = await Notification.requestPermission(); } catch {} }
+    RD.prefs.push = perm === "granted"; rdSave(); renderRadar(true);
+  };
+  body.querySelectorAll("[data-unfollow]").forEach(b => b.onclick = () => { delete RD.follow[b.dataset.unfollow]; rdSave(); renderRadar(true); });
+  const ff = body.querySelector("#rd-fform");
+  if (ff) ff.onsubmit = (e) => {
+    e.preventDefault(); const a = $("rd-faddr").value.trim(), lab = $("rd-flabel").value.trim().slice(0, 24), m = $("rd-fmsg");
+    if (!ethers.isAddress(a)) { m.hidden = false; m.className = "msg err"; m.textContent = "Enter a valid 0x wallet address."; return; }
+    RD.follow[lc(a)] = lab || "Wallet " + short(a); rdSave(); renderRadar(true);
+  };
+  const bf = body.querySelector("#rd-bform");
+  if (bf) bf.onsubmit = async (e) => {
+    e.preventDefault(); const a = lc($("rd-bca").value.trim()), out = $("rd-bout");
+    if (!ethers.isAddress(a)) { out.innerHTML = `<div class="rd-buyers">Enter a valid 0x token address.</div>`; return; }
+    let L = PONS.byId[a];
+    if (!L) { out.innerHTML = `<div class="rd-buyers">Looking up the launch…</div>`;
+      try { const [g] = await multicall([[CONFIG.PONS_FACTORY, IFC(), "getLaunchedToken", [a]]]); if (!g || !g.exists) { out.innerHTML = `<div class="rd-buyers">This address is not a Pons v2 launch.</div>`; return; }
+        const logs = await factoryLogs(T_LAUNCH, PONS_START, PONS.head?.block || await rpc().getBlockNumber(), 4_000_000).then(ls => ls.filter(l => topicAddr(l.topics[1]) === a));
+        L = PONS.byId[a] = { id: a, block: logs[0]?.blockNumber || PONS_START, phase: null, symbol: null }; } catch { out.innerHTML = `<div class="rd-buyers">Could not reach the chain. Try again.</div>`; return; } }
+    RD.lookup = a; out.innerHTML = rdBuyersHTML(L); await rdLoadBuyers(L);
+  };
+}
 
 // ======================= QUICK BUY AMOUNT =======================
 const QB_PRESETS = ["0.005", "0.01", "0.025", "0.05", "0.1", "0.25"];

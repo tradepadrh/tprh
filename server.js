@@ -43,7 +43,7 @@ function buildConfig() {
   if (Number.isInteger(fee) && fee >= 0 && fee <= 100) cfg.DEFAULT_FEE_BPS = fee;
   if (process.env.EXPLORER_URL) cfg.EXPLORER = process.env.EXPLORER_URL.replace(/\/+$/, "");
   const phase = Number(process.env.ROADMAP_PHASE);
-  if (Number.isInteger(phase) && phase >= 1 && phase <= 5) cfg.PHASE = phase;   // roadmap: phases up to this one are live
+  cfg.PHASE = Number.isInteger(phase) && phase >= 1 && phase <= 5 ? phase : 3;   // roadmap: phases up to this one are live
   if (SITE) cfg.SITE_URL = SITE.origin;
   // project info shown at the top of the page: edit these on Railway, no code change needed
   const ca = (process.env.TOKEN_CA || "").trim();
@@ -187,7 +187,7 @@ function proxy(req, res, apiPath, search) {
 // Read-only methods only; nothing that can send a transaction.
 const RPC_UPSTREAM = /^https?:\/\//.test(process.env.RPC_UPSTREAM || "") ? process.env.RPC_UPSTREAM.trim()      // local testing only
   : /^https:\/\//.test(process.env.PUBLIC_RPC_URL || "") ? process.env.PUBLIC_RPC_URL.trim() : "https://rpc.mainnet.chain.robinhood.com";
-const RPC_METHODS = new Set(["eth_chainId", "net_version", "eth_blockNumber", "eth_getBlockByNumber", "eth_getLogs", "eth_call", "eth_getCode", "eth_getBalance"]);
+const RPC_METHODS = new Set(["eth_chainId", "net_version", "eth_blockNumber", "eth_getBlockByNumber", "eth_getLogs", "eth_call", "eth_getCode", "eth_getBalance", "eth_getTransactionByHash"]);
 const rpcCache = new Map(), rpcInflight = new Map();
 function rpcUpstream(body) {
   return new Promise((resolve) => {

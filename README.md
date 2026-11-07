@@ -35,7 +35,7 @@ git push -u origin main
 | `DEXPAPRIKA_API_KEY` | recommended | `api_…` | Free key from console.dexpaprika.com. Unlocks 15m/6H/1D charts and 7 days of history, and raises rate limits. Stays on the server. |
 | `EXPLORER_URL` | no | `https://robinhoodchain.blockscout.com` | Override block explorer. |
 | `DEXPAPRIKA_API` | no | `https://api.dexpaprika.com` | Override API base. |
-| `ROADMAP_PHASE` | no | `2` | Roadmap phase that is live in the navbar (1 Trade, 2 Token, 3 Launch, 4 Radar, 5 Portfolio). Default 1. |
+| `ROADMAP_PHASE` | no | `3` | Roadmap phase that is live in the navbar (1 Trade, 2 Token, 3 Radar, 4 Launch, 5 Portfolio). Default 3 (Radar live). |
 | `WALLETCONNECT_PROJECT_ID` | recommended | `3f2c…` (32 hex) | Free project id from cloud.reown.com. Turns on WalletConnect (QR + mobile wallets). Public value, not a secret. In Reown, add your site domain to the allowlist. |
 | `SITE_URL` | recommended | `https://tradepad.xyz` | Your official https address. **Set it only after the custom domain works.** Other host names (like the `*.up.railway.app` one) then redirect there, `/rpc` and `/verify` refuse other sites, HSTS is on, and copies of the page served elsewhere show a warning. |
 | `TOKEN_CA` | no | `0xAbC…` | Your project's token address, shown in the bar at the top with Copy and Buy buttons. |
@@ -76,6 +76,16 @@ sample data there. Use Railway (or any Node host) for live data.
   gateways, cached in memory. DexPaprika tokens use DexPaprika's own image CDN.
 - Graduated Pons tokens and new Uniswap v4 pools get charts built on-chain: the bonding-curve trades before
   graduation plus the pool's Swap events after it.
+
+## Radar
+Open it from the Radar phase in the navbar (or the Radar button above the Pons curve list). It reads the chain every 10 seconds
+through the read-only `/rpc` relay and never signs anything.
+- **Live feed**: every new Pons v2 launch, newest first; launches that appear while Radar is open are marked NEW.
+- **Moving curves**: curves that gained the most progress since Radar started watching (up to 10 minutes back).
+- **Alerts**: pop-ups (and optional browser notifications) when a curve passes 50% / 80%, a token graduates, or a followed wallet
+  launches. Scope: your watchlist + followed creators, or every launch. Saved in the browser.
+- **Wallets**: follow creator wallets, see their launches, and look up the first buyers of any Pons launch (the sender of each of
+  the earliest curve buys; the creator and followed wallets are marked).
 
 ## Safety checks (CA verified, rug flags)
 For Pons tokens the lists show a lime shield when the token's own website or public Telegram channel shows this
