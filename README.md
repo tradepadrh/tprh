@@ -35,8 +35,9 @@ git push -u origin main
 | `DEXPAPRIKA_API_KEY` | recommended | `api_…` | Free key from console.dexpaprika.com. Unlocks 15m/6H/1D charts and 7 days of history, and raises rate limits. Stays on the server. |
 | `EXPLORER_URL` | no | `https://robinhoodchain.blockscout.com` | Override block explorer. |
 | `DEXPAPRIKA_API` | no | `https://api.dexpaprika.com` | Override API base. |
-| `ROADMAP_PHASE` | no | `1` | Roadmap phase that is live in the navbar (1 Trade, 2 Launch, 3 Radar, 4 Portfolio). Default 1. |
+| `ROADMAP_PHASE` | no | `2` | Roadmap phase that is live in the navbar (1 Trade, 2 Token, 3 Launch, 4 Radar, 5 Portfolio). Default 1. |
 | `WALLETCONNECT_PROJECT_ID` | recommended | `3f2c…` (32 hex) | Free project id from cloud.reown.com. Turns on WalletConnect (QR + mobile wallets). Public value, not a secret. In Reown, add your site domain to the allowlist. |
+| `SITE_URL` | recommended | `https://tradepad.xyz` | Your official https address. **Set it only after the custom domain works.** Other host names (like the `*.up.railway.app` one) then redirect there, `/rpc` and `/verify` refuse other sites, HSTS is on, and copies of the page served elsewhere show a warning. |
 | `TOKEN_CA` | no | `0xAbC…` | Your project's token address, shown in the bar at the top with Copy and Buy buttons. |
 | `TOKEN_SYMBOL` | no | `TP` | Ticker shown next to the CA (without `$`). |
 | `X_URL` | no | `https://x.com/yourhandle` or `@yourhandle` | Your X account, shown in the top bar. |

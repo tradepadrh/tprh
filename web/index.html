@@ -116,6 +116,8 @@ details.safe li i { font-style: normal; width: 16px; text-align: center; font-we
 details.safe li.ok i { color: var(--volt); } details.safe li.warn i, details.safe li.bad i { color: #F4C97C; } details.safe li.bad { color: #F4C97C; } details.safe li.na { color: var(--muted); }
 details.safe p { margin: 4px 14px 12px; font-size: 11px; color: var(--faint); }
 @container tbl (max-width: 620px) { .sf button { padding: 0 9px; } }
+.fake-warn { position: sticky; top: 0; z-index: 80; padding: 12px 18px; background: #F4C97C; color: #2a1d05; font-weight: 800; text-align: center; font-size: 14px; }
+.fake-warn a { color: #2a1d05; text-decoration: underline; }
 /* ---- project bar: your token CA and socials (set on Railway) */
 .proj { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 8px 8px 14px; border-radius: 22px; margin-bottom: 12px; border: 1px solid rgba(204, 255, 4, .35); box-shadow: 0 0 0 1px rgba(204, 255, 4, .06), 0 10px 40px rgba(204, 255, 4, .07); }
 .proj[hidden] { display: none; }
@@ -124,9 +126,9 @@ details.safe p { margin: 4px 14px 12px; font-size: 11px; color: var(--faint); }
 .proj .lbl { font-size: 10px; font-weight: 800; letter-spacing: .18em; color: var(--volt); padding: 4px 8px; border-radius: 99px; background: rgba(204, 255, 4, .1); }
 .proj .ca { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; font-weight: 600; color: var(--fg); background: rgba(0, 0, 0, .28); border: 1px solid var(--line); border-radius: 12px; padding: 7px 12px; user-select: all; cursor: copy; word-break: break-all; }
 .proj .ca .short { display: none; }
-.proj .pb { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); font-weight: 700; font-size: 13px; text-decoration: none; }
+.proj .pb, #rm-s .pb { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); font-weight: 700; font-size: 13px; text-decoration: none; }
 .proj .pb:hover { border-color: rgba(204, 255, 4, .5); }
-.proj .pb.buy { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); }
+.proj .pb.buy, #rm-s .pb.buy { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); }
 .proj .pb svg { width: 14px; height: 14px; }
 .proj .sp { flex: 1; }
 @media (max-width: 760px) { .proj .pb.exp { display: none; } .proj .ca .full { display: none; } .proj .ca .short { display: inline; } .proj .sp { display: none; } .proj { padding: 8px; gap: 8px; } }
@@ -208,7 +210,7 @@ body.noscroll { overflow: hidden; }
 .rm-feats { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 8px; }
 .rm-feats li { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: 16px; background: var(--soft); border: 1px solid var(--line); font-size: 13px; line-height: 1.45; }
 .rm-feats li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--volt); margin-top: 6px; flex: none; }
-.rm-line { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 18px; }
+.rm-line { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 18px; }
 .rm-line button { border: 1px solid var(--line); background: none; border-radius: 14px; padding: 9px 8px; text-align: left; color: var(--muted); font-size: 11px; font-weight: 700; }
 .rm-line button b { display: block; color: var(--fg); font-size: 13px; margin-top: 2px; }
 .rm-line button i { display: block; height: 3px; border-radius: 3px; background: var(--line); margin-bottom: 7px; }
@@ -1286,7 +1288,7 @@ function safeBadge(id) {
 }
 function safeFilterOk(id) {
   if (!S.safeOnly) return true;
-  const r = safetyOf(id); if (S.safeOnly === "verified") return r.verified; return !r.risky;
+  const r = safetyOf(id); if (S.safeOnly === "verified") return r.verified && !r.risky; return !r.risky;
 }
 // fill SAFE for tokens on screen: creator bag (one multicall) and the website/Telegram CA check (server)
 let safeTimer = null, safeBusy = false;
@@ -1865,7 +1867,7 @@ async function wagmi() {
       rpcUrls: { default: { http: [CONFIG.RPC] } }, blockExplorers: { default: { name: "Blockscout", url: CONFIG.EXPLORER } } });
     const connectors = [C.injected({ shimDisconnect: true }), C.coinbaseWallet({ appName: "TradePad", appLogoUrl: location.origin + "/tp-mark.svg" })];
     if (CONFIG.WC_PROJECT_ID) connectors.push(C.walletConnect({ projectId: CONFIG.WC_PROJECT_ID, showQrModal: true,
-      metadata: { name: "TradePad", description: "The Pons-native DEX on Robinhood Chain", url: location.origin, icons: [location.origin + "/tp-mark.svg"] },
+      metadata: { name: "TradePad", description: "The Pons-native DEX on Robinhood Chain", url: CONFIG.SITE_URL || location.origin, icons: [(CONFIG.SITE_URL || location.origin) + "/tp-mark.svg"] },
       qrModalOptions: { themeMode: "dark", themeVariables: { "--wcm-accent-color": "#CCFF04", "--wcm-accent-fill-color": "#141A00", "--wcm-background-color": "#1F1B16" } } }));
     const cfg = W.createConfig({ chains: [chain], connectors, multiInjectedProviderDiscovery: true, transports: { [chain.id]: W.http(READ_RPC()) }, ssr: false });
     return { W, cfg };
@@ -2329,11 +2331,13 @@ $("router").addEventListener("input", async (e) => {
 const PHASES = [
   { n: 1, name: "Trade", title: "The Pons DEX", lead: "Trade every Pons token in one place, from the first block on the bonding curve to the Uniswap pool after graduation.",
     feats: ["Pons curve, graduated and Uniswap tokens sorted on-chain", "Live candles and buy/sell activity from the very first curve trade", "Swaps routed through the TradePad router with an on-chain price check"] },
-  { n: 2, name: "Launch", title: "Launch from TradePad", lead: "Start a Pons launch from the TradePad interface and share a live page for it.",
+  { n: 2, name: "Token", title: "The TradePad token", lead: "Our token is live on the Pons bonding curve. The official contract address is shown in the bar at the top of this page.",
+    feats: ["Launched on Pons, Robinhood Chain", "Dev holds 0%: the dev supply is burned", "Official CA only on tradepad.dev and our official X"] },
+  { n: 3, name: "Launch", title: "Launch from TradePad", lead: "Start a Pons launch from the TradePad interface and share a live page for it.",
     feats: ["Create a Pons launch with name, ticker and image", "A shareable launch page with the live curve and chart", "Launch stats for creators: holders, volume, graduation progress"] },
-  { n: 3, name: "Radar", title: "Catch launches early", lead: "A live feed of new Pons launches and the curves that are moving, so you see them before everyone else.",
+  { n: 4, name: "Radar", title: "Catch launches early", lead: "A live feed of new Pons launches and the curves that are moving, so you see them before everyone else.",
     feats: ["Real-time feed of new Pons launches", "Alerts when a curve passes 50%, 80% and graduation", "Follow creator wallets and see the first buyers of a launch"] },
-  { n: 4, name: "Portfolio", title: "Every bag, one view", lead: "Your Pons positions across the curve and Uniswap, with profit and loss per token.",
+  { n: 5, name: "Portfolio", title: "Every bag, one view", lead: "Your Pons positions across the curve and Uniswap, with profit and loss per token.",
     feats: ["All your Pons tokens in one wallet view", "Entry price, PnL and value per token", "Graduation watch for the curves you hold"] },
 ];
 const LIVE_PHASE = Math.max(1, Math.min(PHASES.length, Number(CONFIG.PHASE) || 1));
@@ -2359,6 +2363,11 @@ function openPhase(n) {
   $("rm-line").innerHTML = PHASES.map(q => `<button data-ph="${q.n}" data-s="${phState(q.n)}" class="${q.n === n ? "cur" : ""}"><i></i>Phase ${q.n}<b>${q.name}</b></button>`).join("");
   $("rm-line").querySelectorAll("button").forEach(b => b.onclick = () => { const k = Number(b.dataset.ph); if (k === 1) { closePhase(); window.scrollTo({ top: 0, behavior: "smooth" }); } else openPhase(k); });
   $("rm-s").textContent = s === "live" ? "Live now." : s === "next" ? "Coming in the next phase. Follow TradePad on X for the launch." : `Unlocks after Phase ${n - 1}.`;
+  const ca = /^0x[0-9a-fA-F]{40}$/.test(CONFIG.TOKEN_CA || "") ? CONFIG.TOKEN_CA : "";
+  if (n === 2 && s === "live" && ca) {   // token phase: jump straight to the official token
+    const b = document.createElement("button"); b.className = "pb buy"; b.style.marginLeft = "10px"; b.innerHTML = `${BOLT} Trade the token`;
+    b.onclick = () => { closePhase(); openProjectTrade(lc(ca)); }; $("rm-s").appendChild(b);
+  }
   $("rm").hidden = false; $("rm-x").focus();
   if (window.gsap && !REDUCED) gsap.fromTo(".rm-card", { y: 24, opacity: .001, scale: .98 }, { y: 0, opacity: 1, scale: 1, duration: .45, ease: "power3.out" });
 }
@@ -2397,6 +2406,15 @@ async function openProjectTrade(ca) {
   showMsg("This token has no pool yet.", "err");
 }
 renderProject();
+// a copy of this page served from another address gets a loud warning that points to the official site
+(function officialSite() {
+  const site = CONFIG.SITE_URL; if (!site) return;
+  let host; try { host = new URL(site).host; } catch { return; }
+  if (location.host === host || /^(localhost|127\.0\.0\.1)(:|$)/.test(location.host)) return;
+  const bar = document.createElement("div"); bar.className = "fake-warn"; bar.setAttribute("role", "alert");
+  bar.innerHTML = `This is not the official TradePad address. Do not connect your wallet here. Official site: <a href="${esc(site)}">${esc(host)}</a>`;
+  document.body.prepend(bar);
+})();
 
 // ======================= QUICK BUY AMOUNT =======================
 const QB_PRESETS = ["0.005", "0.01", "0.025", "0.05", "0.1", "0.25"];

@@ -20,6 +20,16 @@ const NETWORK = "robinhood";
 const API_ORIGIN = (process.env.DEXPAPRIKA_API || "https://api.dexpaprika.com").replace(/\/+$/, "");
 const API_KEY = (process.env.DEXPAPRIKA_API_KEY || "").trim();
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+// ---------------------------------------------------------------- official site address
+// SITE_URL = your public https address (for example https://tradepad.xyz). When set:
+//  - requests on any other host name are sent there with a 301 (one official address, no look-alike copies on Railway URLs)
+//  - /rpc and /verify only answer pages served from that address (other sites can't use your relays)
+//  - browsers are told to always use HTTPS (HSTS)
+//  - the page shows a warning if someone serves a copy of it from another address
+let SITE = null;
+try { const u = new URL((process.env.SITE_URL || "").trim()); if (u.protocol === "https:" && !u.username && !u.password) SITE = u; } catch {}
+const hostOf = (req) => String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim().toLowerCase();
+function sameSite(origin) { if (!SITE) return true; try { return new URL(origin).host.toLowerCase() === SITE.host.toLowerCase(); } catch { return false; } }
 
 // ---------------------------------------------------------------- config.js
 function buildConfig() {
@@ -33,7 +43,8 @@ function buildConfig() {
   if (Number.isInteger(fee) && fee >= 0 && fee <= 100) cfg.DEFAULT_FEE_BPS = fee;
   if (process.env.EXPLORER_URL) cfg.EXPLORER = process.env.EXPLORER_URL.replace(/\/+$/, "");
   const phase = Number(process.env.ROADMAP_PHASE);
-  if (Number.isInteger(phase) && phase >= 1 && phase <= 4) cfg.PHASE = phase;   // roadmap: phases up to this one are live
+  if (Number.isInteger(phase) && phase >= 1 && phase <= 5) cfg.PHASE = phase;   // roadmap: phases up to this one are live
+  if (SITE) cfg.SITE_URL = SITE.origin;
   // project info shown at the top of the page: edit these on Railway, no code change needed
   const ca = (process.env.TOKEN_CA || "").trim();
   if (ADDRESS_RE.test(ca)) cfg.TOKEN_CA = ca;
@@ -69,6 +80,7 @@ const SECURITY_HEADERS = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "X-Frame-Options": "DENY",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  ...(SITE ? { "Strict-Transport-Security": "max-age=15552000" } : {}),
 };
 // Page CSP: scripts only from this site and the pinned CDNs; nobody may frame the DEX (clickjacking).
 // connect-src stays open to https/wss because wallets (WalletConnect relay, Coinbase) talk to their own hosts.
@@ -308,8 +320,17 @@ function verifyRoute(req, res) {
 
 // ---------------------------------------------------------------- server
 const server = http.createServer((req, res) => {
-  if (req.method === "POST" && req.url === "/rpc") return rpcRelay(req, res);
-  if (req.method === "POST" && req.url === "/verify") return verifyRoute(req, res);
+  // health checks come from Railway itself on its own host name: always answer them
+  if (req.url === "/healthz") return send(res, 200, "ok", { "Content-Type": "text/plain" });
+  // one official address: everything else is redirected there
+  if (SITE && hostOf(req) !== SITE.host.toLowerCase()) {
+    if (req.method !== "GET" && req.method !== "HEAD") return json(res, 403, { error: "use " + SITE.origin });
+    return send(res, 301, "", { Location: SITE.origin + (req.url.startsWith("/") ? req.url : "/"), "Cache-Control": "no-store" });
+  }
+  if (req.method === "POST" && (req.url === "/rpc" || req.url === "/verify")) {
+    if (SITE && !sameSite(req.headers.origin || "")) return json(res, 403, { error: "forbidden origin" });
+    return req.url === "/rpc" ? rpcRelay(req, res) : verifyRoute(req, res);
+  }
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, "Method Not Allowed", { Allow: "GET, HEAD, POST" });
 
   let url;
