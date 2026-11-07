@@ -72,6 +72,26 @@ a { color: inherit; }
 .link { width: 18px; height: 2px; border-radius: 2px; background: var(--line); flex: none; }
 .link.done { background: var(--volt); box-shadow: 0 0 8px rgba(204, 255, 4, .5); }
 @media (max-width: 1240px) { .ph .st { display: none; } }
+/* feature nav: tools first, things that are coming sit in one "Soon" menu */
+.nv { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; color: var(--muted); padding: 9px 15px; border-radius: 99px; font-weight: 700; font-size: 13.5px; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
+.road .nv + .nv { margin-left: 2px; }
+.nv:hover, .nv[aria-expanded="true"] { color: var(--fg); background: var(--soft); }
+.nv.on { background: var(--accent); color: var(--accent-fg); }
+.nv .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--volt); box-shadow: 0 0 0 0 rgba(204, 255, 4, .6); animation: nvp 1.8s infinite; }
+@keyframes nvp { 70% { box-shadow: 0 0 0 7px rgba(204, 255, 4, 0); } 100% { box-shadow: 0 0 0 0 rgba(204, 255, 4, 0); } }
+.nv svg.cv { width: 10px; height: 10px; opacity: .7; transition: transform .2s; } .nv[aria-expanded="true"] svg.cv { transform: rotate(180deg); }
+.nv .tg { font-size: 9.5px; font-weight: 800; letter-spacing: .1em; padding: 2px 7px; border-radius: 99px; background: var(--soft); color: var(--faint); }
+.nv-pop { position: fixed; z-index: 70; min-width: 290px; padding: 6px; border-radius: 20px; background: rgba(32, 28, 23, .97); }
+.nv-pop[hidden] { display: none; }
+.nv-pop .it { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 0; border-radius: 14px; background: none; color: var(--fg); text-align: left; cursor: pointer; }
+.nv-pop .it:hover { background: var(--soft); }
+.nv-pop .it.off { cursor: default; } .nv-pop .it.off:hover { background: none; }
+.nv-pop .ic { width: 34px; height: 34px; flex: none; border-radius: 11px; display: grid; place-items: center; background: var(--volt-soft); color: var(--volt); }
+.nv-pop .it.off .ic { background: var(--soft); color: var(--faint); }
+.nv-pop .ic svg { width: 17px; height: 17px; }
+.nv-pop b { display: block; font-size: 14px; } .nv-pop small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+.nv-pop em { margin-left: auto; font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .12em; padding: 3px 8px; border-radius: 99px; background: var(--volt-soft); color: var(--volt); }
+.nv-pop .it.off em { background: var(--soft); color: var(--faint); }
 /* ---- rows: two-line asset cell, responsive columns, sticky trade buttons */
 tr.row-go { cursor: pointer; }
 .asset .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -185,6 +205,8 @@ body.noscroll { overflow: hidden; }
 .road-list em { margin-left: auto; font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .12em; color: var(--faint); }
 .road-list button[data-s="live"] i { background: var(--volt); color: var(--volt-fg); border-color: var(--volt); } .road-list button[data-s="live"] em { color: var(--volt); }
 .road-list button[data-s="next"] em { color: var(--warn); }
+.road-list i svg { width: 13px; height: 13px; } .road-list button[data-s="live"] i { background: var(--volt-soft); color: var(--volt); border-color: rgba(204, 255, 4, .35); }
+.road-list button[disabled] { color: var(--muted); cursor: default; } .road-list button[disabled]:hover { border-color: transparent; }
 /* wallet picker */
 .wm-list { display: grid; gap: 8px; margin: 14px 0 6px; }
 .wm-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--soft); color: var(--fg); text-align: left; transition: border-color .2s, background .2s; }
@@ -594,7 +616,8 @@ th.r, td.r { text-align: right; }
     <div class="proj glass" id="proj" hidden></div>
     <header class="top">
       <div class="logo glass" aria-label="TradePad"><svg viewBox="8 14 160 160" width="26" height="26" aria-hidden="true"><path fill="var(--volt)" d="M44 41 H150 C158 41 164.5 47 164.5 55 V61.5 L130.5 115.5 C128.5 118.5 125.5 119.5 122 119.5 H92.5 L76.5 147 H53 L82 101 H115.5 L140 61.5 H32.5 Z"/><path fill="var(--volt)" d="M25 71 H122 L109.5 91.5 H73.5 L39.5 147 H16.5 L51 91.5 H12.5 Z"/></svg></div>
-      <nav class="nav road glass" id="road" aria-label="Roadmap"></nav>
+      <nav class="nav road glass" id="road" aria-label="Main"></nav>
+      <div class="nv-pop glass" id="nv-pop" hidden role="menu"></div>
       <span class="grow"></span>
       <span class="status glass" id="status" data-s="live"><i></i><span id="status-t">Robinhood Chain</span></span>
       <button class="menu-btn glass" id="menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
@@ -831,9 +854,9 @@ th.r, td.r { text-align: right; }
 <div class="drawer" id="drawer" hidden>
   <aside class="dr-card glass" aria-label="Menu">
     <div class="dr-top"><b>TradePad</b><button class="icon-btn" id="dr-x" aria-label="Close menu">✕</button></div>
+    <div class="dr-k">Explore</div><div class="dr-list road-list" id="dr-road"></div>
     <div class="dr-k">Go to</div><div class="dr-list" id="dr-sec"></div>
     <div class="dr-k">Settings</div><button class="qb-set wide" id="dr-qb"></button>
-    <div class="dr-k">Roadmap</div><div class="dr-list road-list" id="dr-road"></div>
   </aside>
 </div>
 <div class="rm" id="wm" hidden role="dialog" aria-modal="true" aria-labelledby="wm-t">
@@ -2477,17 +2500,54 @@ const LOCK = '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stro
 const topBar = document.querySelector(".top");
 const onTopScroll = () => topBar && topBar.classList.toggle("stuck", window.scrollY > 8);
 window.addEventListener("scroll", onTopScroll, { passive: true }); onTopScroll();
+const NVI = {
+  radar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 12l5.5-5.5"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6 4 4 6-7"/><path d="M15 8h5v5"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 21h4"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20a7.5 7.5 0 0115 0"/></svg>',
+  rocket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c3.5 2 5 5.5 5 9l-2.5 3h-5L7 12c0-3.5 1.5-7 5-9z"/><circle cx="12" cy="9.5" r="1.6"/><path d="M9.5 18l-1 3M14.5 18l1 3"/></svg>',
+  bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6.5a3 3 0 016 0V8"/></svg>',
+  chain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+};
+const CHEV = '<svg class="cv" viewBox="0 0 12 12"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const NV_LIVE = [["feed", "radar", "Radar", "New Pons launches, live"], ["moving", "up", "Moving", "Curves climbing right now"], ["alerts", "bell", "Alerts", "50%, 80% and graduation"], ["wallets", "user", "Wallets", "Follow creator wallets"]];
+const NV_SOON = [["rocket", "Launch", "Start a Pons launch from TradePad"], ["bag", "Portfolio", "Every Pons bag and its PnL"], ["chain", "Multichain", "More chains, same TradePad"]];
+const tokenCA = () => /^0x[0-9a-fA-F]{40}$/.test(CONFIG.TOKEN_CA || "") ? CONFIG.TOKEN_CA : "";
+function navGo(k, tab) {
+  closeNavPop();
+  if (k === "trade") return window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
+  if (k === "radar") { if (tab) { RD.tab = tab; save("rdtab", tab); } return openRadar(); }
+  if (k === "token") return tokenCA() ? openProjectTrade(lc(tokenCA())) : openPhase(2);
+  if (k === "verify") return openVerify("");
+}
+function navPopHTML(menu) {
+  return menu === "live"
+    ? NV_LIVE.map(([t, ic, n, d]) => `<button class="it" role="menuitem" data-nvt="${t}"><span class="ic">${NVI[ic]}</span><span><b>${n}</b><small>${d}</small></span>${t === "feed" ? "<em>LIVE</em>" : ""}</button>`).join("")
+    : NV_SOON.map(([ic, n, d]) => `<div class="it off" role="menuitem" aria-disabled="true"><span class="ic">${NVI[ic]}</span><span><b>${n}</b><small>${d}</small></span><em>SOON</em></div>`).join("");
+}
+function closeNavPop() { $("nv-pop").hidden = true; $("road").querySelectorAll("[aria-expanded]").forEach(b => b.setAttribute("aria-expanded", "false")); }
+function openNavPop(btn) {
+  const pop = $("nv-pop"), was = btn.getAttribute("aria-expanded") === "true";
+  closeNavPop(); if (was) return;
+  pop.innerHTML = navPopHTML(btn.dataset.menu); pop.hidden = false; btn.setAttribute("aria-expanded", "true");
+  const r = btn.getBoundingClientRect(), w = pop.offsetWidth;
+  pop.style.top = (r.bottom + 10) + "px"; pop.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + "px";
+  pop.querySelectorAll("[data-nvt]").forEach(b => b.onclick = () => navGo("radar", b.dataset.nvt));
+  if (window.gsap && !REDUCED) gsap.fromTo(pop, { y: -6, opacity: .001 }, { y: 0, opacity: 1, duration: .2, ease: "power2.out" });
+}
+document.addEventListener("click", (e) => { if (!$("nv-pop").hidden && !e.target.closest("#nv-pop, [data-menu]")) closeNavPop(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNavPop(); });
+window.addEventListener("resize", closeNavPop); window.addEventListener("scroll", () => { if (!$("nv-pop").hidden) closeNavPop(); }, { passive: true });
 function renderRoad() {
-  $("road").innerHTML = PHASES.map((p, i) => {
-    const s = phState(p.n);
-    return (i ? `<span class="link${s === "live" ? " done" : ""}" aria-hidden="true"></span>` : "") +
-      `<button class="ph${p.n === LIVE_PHASE ? " now" : ""}" data-ph="${p.n}" data-s="${s}" title="Phase ${p.n} · ${p.name}"><span class="n">${s === "soon" ? LOCK : String(p.n).padStart(2, "0")}</span>${p.name}<i class="st">${s === "live" ? "LIVE" : s === "next" ? "NEXT" : "SOON"}</i></button>`;
-  }).join("");
-  $("road").querySelectorAll(".ph").forEach(b => b.onclick = () => {
-    const n = Number(b.dataset.ph);
-    if (n === 1) { window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" }); return; }
-    openPhase(n);
-  });
+  $("road").innerHTML =
+    `<button class="nv on" data-nv="trade">Trade</button>` +
+    `<button class="nv" data-menu="live" aria-haspopup="menu" aria-expanded="false"><span class="dot"></span>Live${CHEV}</button>` +
+    `<button class="nv" data-nv="token">Token</button>` +
+    (CONFIG.SUBMIT ? `<button class="nv" data-nv="verify">Get verified</button>` : "") +
+    `<button class="nv" data-menu="soon" aria-haspopup="menu" aria-expanded="false">Soon${CHEV}</button>`;
+  $("road").querySelectorAll("[data-nv]").forEach(b => b.onclick = () => navGo(b.dataset.nv));
+  $("road").querySelectorAll("[data-menu]").forEach(b => b.onclick = (e) => { e.stopPropagation(); openNavPop(b); });
 }
 function openPhase(n) {
   const p = PHASES[n - 1], s = phState(n);
@@ -2902,10 +2962,12 @@ function tmStatus(html, kind) { const el = $("tm-status"); el.hidden = false; el
 const SECTIONS = [["c-pulse", "Market overview"], ["c-chart", "Chart"], ["c-swap", "Trade"], ["c-table", "Tokens · Pons curve"], ["c-trend", "Trending"], ["c-trades", "Buy / sell activity"], ["c-wallet", "Wallet"], ["c-watch", "Watchlist"], ["c-rev", "TradePad fees"]];
 function openDrawer() {
   $("dr-sec").innerHTML = SECTIONS.map(([id, n]) => `<button data-go="${id}">${n}<span>›</span></button>`).join("");
-  $("dr-road").innerHTML = PHASES.map(p => `<button data-ph="${p.n}" data-s="${phState(p.n)}"><i>${String(p.n).padStart(2, "0")}</i>${p.name}<em>${phState(p.n) === "live" ? "LIVE" : phState(p.n) === "next" ? "NEXT" : "SOON"}</em></button>`).join("");
+  $("dr-road").innerHTML = NV_LIVE.map(([t, ic, n]) => `<button data-nvt="${t}" data-s="live"><i>${NVI[ic]}</i>${n}${t === "feed" ? "<em>LIVE</em>" : ""}</button>`).join("") +
+    `<button data-nv="token" data-s="live"><i>${BOLT}</i>Token</button>` + (CONFIG.SUBMIT ? `<button data-nv="verify" data-s="live"><i>${NVI.shield}</i>Get verified</button>` : "") +
+    NV_SOON.map(([ic, n]) => `<button disabled data-s="soon"><i>${NVI[ic]}</i>${n}<em>SOON</em></button>`).join("");
   $("dr-qb").innerHTML = `${BOLT} Quick buy <b>${esc(S.qb)} ETH</b>`;
   $("dr-sec").querySelectorAll("button").forEach(b => b.onclick = () => { closeDrawer(); const el = $(b.dataset.go); (el.closest(".tm") ? (closeTrade(), $(b.dataset.go)) : el).scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" }); });
-  $("dr-road").querySelectorAll("button").forEach(b => b.onclick = () => { closeDrawer(); const n = Number(b.dataset.ph); if (n === 1) window.scrollTo({ top: 0, behavior: "smooth" }); else openPhase(n); });
+  $("dr-road").querySelectorAll("button:not([disabled])").forEach(b => b.onclick = () => { closeDrawer(); b.dataset.nvt ? navGo("radar", b.dataset.nvt) : navGo(b.dataset.nv); });
   $("drawer").hidden = false; $("menu-btn").setAttribute("aria-expanded", "true"); document.body.classList.add("noscroll");
 }
 function closeDrawer() { $("drawer").hidden = true; $("menu-btn").setAttribute("aria-expanded", "false"); if ($("tm").hidden) document.body.classList.remove("noscroll"); }

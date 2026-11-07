@@ -422,7 +422,7 @@ const server = http.createServer((req, res) => {
   try { urlPath = decodeURIComponent(url.pathname); } catch { return send(res, 400, "Bad Request"); }
 
   if (urlPath === "/healthz") return send(res, 200, "ok", { "Content-Type": "text/plain" });
-  if (urlPath === "/config.js") return send(res, 200, CONFIG_JS, { "Content-Type": TYPES[".js"], "Cache-Control": "no-cache" });
+  if (urlPath === "/config.js") return send(res, 200, CONFIG_JS, { "Content-Type": TYPES[".js"], "Cache-Control": "no-store, max-age=0" });
   if (url.pathname.startsWith("/dp/")) return proxy(req, res, url.pathname.slice(3), url.search);
   if (url.pathname.startsWith("/img/ipfs/")) return ipfsImage(req, res, url.pathname.slice(10));
 
@@ -438,7 +438,8 @@ const server = http.createServer((req, res) => {
       ...SECURITY_HEADERS,
       ...(isHtml ? { "Content-Security-Policy": CSP } : {}),
       "Content-Type": TYPES[ext] || "application/octet-stream",
-      "Cache-Control": isHtml || target.endsWith("config.js") ? "no-cache" : "public, max-age=86400",
+      // the app is one HTML file: never let a browser or CDN keep an old copy after a deploy
+      "Cache-Control": isHtml || target.endsWith("config.js") ? "no-store, max-age=0" : "public, max-age=3600",
     });
     if (req.method === "HEAD") return res.end();
     fs.createReadStream(target).on("error", () => res.destroy()).pipe(res);
