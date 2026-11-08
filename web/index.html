@@ -431,7 +431,7 @@ body.noscroll { overflow: hidden; }
 .lsearch { padding: 14px 14px 2px; } .lsearch .search { width: 100%; }
 #src button { flex-direction: column; justify-content: center; gap: 4px; text-align: center; padding-block: 9px; }
 #src button small { display: none; } #src button b { white-space: nowrap; }
-#sorts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } #sorts::-webkit-scrollbar { display: none; } #sorts > * { flex: none; }
+#sorts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); padding-right: 28px; } #sorts::-webkit-scrollbar { display: none; } #sorts > * { flex: none; }
 #c-table .venues { margin-top: 2px; } #c-table .venues button { padding: 6px 12px; font-size: 12.5px; }
 @media (min-width: 1101px) {
   .top { flex-wrap: nowrap; }
@@ -1356,6 +1356,8 @@ function renderSorts() {
   $("src").style.setProperty("--i", SRC_I[S.src]);
   $("src").querySelectorAll("[data-src]").forEach(b => b.setAttribute("aria-selected", b.dataset.src === S.src));
   $("venues").hidden = S.src !== "uni";
+  const on = $("sorts").querySelector('[data-sf][aria-pressed="true"]');
+  if (on) requestAnimationFrame(() => { const r = $("sorts"); if (on.offsetLeft + on.offsetWidth > r.scrollLeft + r.clientWidth) r.scrollLeft = on.offsetLeft - 60; });
 }
 $("src").querySelectorAll("[data-src]").forEach(b => b.onclick = () => {
   if (S.src === b.dataset.src) return;
@@ -1385,6 +1387,12 @@ function updateCounts() {
   $("n-watch").textContent = S.stars.size ? S.stars.size + " starred" : "your stars";
 }
 let tableSeq = 0;
+// a safety filter can hide every row: say so and offer a one-click way back
+function filterEmpty(n, what) {
+  const name = S.safeOnly === "verified" ? "CA verified" : "Hide risky";
+  return `<tr><td colspan="7" class="empty"><b>${n ? n + " " + what + " hidden" : "Everything is hidden"} by the "${name}" filter.</b><br>None of them pass it right now. <button class="link-btn" id="sf-clear" style="display:inline">Show all ${what}</button></td></tr>`;
+}
+function wireFilterEmpty() { const b = $("sf-clear"); if (b) b.onclick = () => { S.safeOnly = ""; save("safe", ""); renderTable(); }; }
 async function renderTable() {
   const seq = ++tableSeq; const body = $("assets");
   renderSorts(); updateCounts();
@@ -1415,7 +1423,7 @@ async function renderTable() {
     const msg = S.src === "grad" && PONS.error ? "Could not reach Robinhood Chain to read Pons graduations. Try again in a moment."
       : S.src === "grad" ? "Loading graduated Pons tokens…"
       : sort === "gainers" ? "No tokens in this list are up right now." : sort === "losers" ? "No tokens in this list are down right now." : "No pools match this filter.";
-    body.innerHTML = `<tr><td colspan="6" class="empty">${msg}</td></tr>`; return;
+    body.innerHTML = S.src === "grad" && S.safeOnly && pools.length === 0 && allLoadedPools().some(p => isPonsTraded(splitPool(p).base.id)) ? filterEmpty(0, "tokens") : `<tr><td colspan="6" class="empty">${msg}</td></tr>`; wireFilterEmpty(); return;
   }
   body.innerHTML = rows.map(({ p, base, quote, t }) => {
     const id = lc(base.id);
@@ -1442,12 +1450,13 @@ async function renderCurveTable(seq) {
     renderSorts(); updateCounts();
   }
   const sort = S.sort.curve;
-  let rows = PONS.launches.filter(l => l.phase === 0 && l.symbol != null && isFinite(l.priceQ)).filter(l => safeFilterOk(l.id));
+  const onCurve = PONS.launches.filter(l => l.phase === 0 && l.symbol != null && isFinite(l.priceQ));
+  let rows = onCurve.filter(l => safeFilterOk(l.id));
   rows.forEach(priceLaunch);                                         // ETH price may have arrived since the last read
   if (sort === "near") rows = rows.slice().sort((a, b) => (b.progress || 0) - (a.progress || 0));
   if (sort === "mcap") rows = rows.slice().sort((a, b) => (b.mcap || 0) - (a.mcap || 0));
   rows = rows.slice(0, CONFIG.TABLE_ROWS);
-  if (!rows.length) { body.innerHTML = `<tr><td colspan="7" class="empty">No Pons launches on the bonding curve right now.</td></tr>`; return; }
+  if (!rows.length) { body.innerHTML = onCurve.length && S.safeOnly ? filterEmpty(onCurve.length, "launches") : `<tr><td colspan="7" class="empty">No Pons launches on the bonding curve right now.</td></tr>`; wireFilterEmpty(); return; }
   body.innerHTML = rows.map(L => {
     const pct = Math.max(0, Math.min(1, L.progress || 0)) * 100;
     const price = L.priceUsd > 0 ? fmtPrice(L.priceUsd) : L.priceQ > 0 ? fmtSmall(L.priceQ) + " " + esc(L.pairSym) : "—";
