@@ -1847,7 +1847,7 @@ async function selectPool(pool) {
   const a = $("t-addr"); a.textContent = short(base.id); a.href = `${CONFIG.EXPLORER}/token/${base.id}`;
   showLinks(base.id);
   $("cp").onclick = (e) => copy(base.id, e.currentTarget);
-  $("share").onclick = async (e) => { const el = e.currentTarget, html = el.innerHTML; await copy(`${(CONFIG.SITE_URL || location.origin).replace(/\/$/, "")}/#t=${base.id}`, el, "Copied"); setTimeout(() => { el.innerHTML = html; }, 1900); };
+  $("share").onclick = (e) => shareToken(base.id, e.currentTarget);
   $("tx-pool").textContent = base.symbol || "";
   showTokenStats(S.tokens[lc(base.id)]);
   renderSwapStatic(); renderActivity();
@@ -3051,11 +3051,19 @@ function closeTrade() {
   if (swapHome) swapHome.parentNode.insertBefore($("c-swap"), swapHome.nextSibling);
   if (chartHome) chartHome.parentNode.insertBefore($("c-chart"), chartHome.nextSibling);
 }
+const SHARE_I = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>';
+const tokenLink = (id) => `${(CONFIG.SITE_URL || location.origin).replace(/\/$/, "")}/#t=${id}`;
+async function shareToken(id, el) { const html = el.innerHTML; await copy(tokenLink(id), el, "Copied"); setTimeout(() => { el.innerHTML = html; }, 1900); }
+$("tm-head").addEventListener("click", (e) => {
+  const id = S.sel?.base?.id; if (!id) return;
+  const c = e.target.closest("[data-tmcopy]"), sh = e.target.closest("[data-tmshare]");
+  if (c) copy(id, c, "Copy CA"); else if (sh) shareToken(id, sh);
+});
 function renderTmHead() {
   const sel = S.sel; if (!sel) return; const { base, pool } = sel, t = S.tokens[lc(base.id)] || {};
   const L = pool.curve, pct = L ? Math.min(100, (L.progress || 0) * 100) : null;
   $("tm-head").innerHTML = `<div class="tm-tok">${avHTML(base.symbol, base.id)}<div style="min-width:0"><div class="tm-sym">${esc(base.symbol)} <span class="muted">/ ${esc(sel.quote.symbol || "")}</span></div>
-    <div class="tm-sub"><span class="ellip">${esc(base.name || "")}</span>${linksHTML(base.id)}</div></div></div>
+    <div class="tm-sub"><span class="ellip">${esc(base.name || "")}</span>${linksHTML(base.id)}<button class="copy" data-tmcopy>Copy CA</button><button class="copy share" data-tmshare title="Copy a link that opens this token on TradePad">${SHARE_I}Share</button></div></div></div>
     <div class="tm-stats"><div><b>${t.price > 0 ? fmtPrice(t.price) : "—"}</b><span>Price</span></div><div><b>${isFinite(t.change) ? chipHTML(t.change) : "—"}</b><span>24h</span></div>${t.fdv > 0 ? `<div><b>${fmtUsd(t.fdv)}</b><span>Mkt cap</span></div>` : ""}</div>
     ${safetyPanel(base.id)}
     ${pct != null ? `<div class="tm-grad"><span class="gm${pct >= 80 ? " hot" : ""}"><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span>${pct.toFixed(1)}%</span></span><small>to graduation</small></div>` : ""}`;
