@@ -1788,6 +1788,20 @@ function foboDerive(F) {
   F.priceUsd = F.pxQ * u; F.mcap = F.priceUsd * FOBO_SUPPLY;
 }
 const foboTaxLeft = (F) => F.launchedAt ? Math.max(0, F.launchedAt + FOBO_TAX_S - Date.now() / 1000) : 0;
+// token logos: the launch event carries a metadata URL on images.fobo.fun; the server reads it for us (no CORS there)
+const FOBO_IMG_TRY = new Set();
+function foboImages(rows) {
+  for (const F of rows) {
+    const m = /^https:\/\/images\.fobo\.fun\/tokens\/meta-([0-9a-f]{8,64})\.json$/.exec(F.meta || "");
+    if (!m || IMG[F.id] || FOBO_IMG_TRY.has(F.id)) continue;
+    FOBO_IMG_TRY.add(F.id);
+    fetch(`/fobo-meta/${m[1]}`).then(r => r.ok ? r.json() : null).then(j => {
+      if (j && j.x) F.x = j.x;
+      if (j && j.image) { IMG[F.id] = j.image; paintAvatars(); }
+      else FOBO_IMG_TRY.delete(F.id);
+    }).catch(() => FOBO_IMG_TRY.delete(F.id));
+  }
+}
 async function loadFobo(force) {
   if (FOBO.loading) return FOBO.loading;
   if (!force && FOBO.ready && Date.now() - FOBO.at < 9000) return;
@@ -1838,6 +1852,7 @@ async function loadFobo(force) {
         }
       }
       for (const F of rows) if (F.devBuy <= 0) F.lock = "none";
+      foboImages(rows);
       for (const q of new Set(rows.map(F => F.quote))) if (q !== ZERO && q !== USDG && !S.tokens[q]?.price && !FOBO.qAsked?.has(q)) { (FOBO.qAsked ||= new Set()).add(q); getToken(q).then(() => { rows.forEach(F => F.quote === q && foboDerive(F)); if (S.src === "fobo") renderTable(); }).catch(() => {}); }
       FOBO.lastBlock = head; FOBO.ready = true; FOBO.error = null; FOBO.at = Date.now();
     } catch (e) { FOBO.error = e; console.error("[fobo]", e); }

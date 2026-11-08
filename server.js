@@ -250,6 +250,29 @@ function getOnce(url, max) {
     req.on("timeout", () => req.destroy()); req.on("error", () => resolve(null));
   });
 }
+// fobo.fun token metadata (name, image) lives on images.fobo.fun without CORS, so the app asks us.
+// Only that host's meta-*.json files are fetched; answers are cached in memory.
+const FOBO_META = new Map();
+async function foboMeta(req, res, id) {
+  if (!/^[0-9a-f]{8,64}$/.test(id)) return send(res, 400, "Bad Request");
+  let hit = FOBO_META.get(id);
+  if (!hit || (hit.err && Date.now() - hit.t > 300000)) {
+    hit = { t: Date.now(), body: "{}", err: true };
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 4000);
+      const r = await fetch(`https://images.fobo.fun/tokens/meta-${id}.json`, { signal: ctl.signal }); clearTimeout(tm);
+      if (r.ok) {
+        const j = JSON.parse((await r.text()).slice(0, 20000));
+        const img = typeof j.image === "string" && /^https:\/\/images\.fobo\.fun\/[\w./-]+\.(webp|png|jpe?g|gif)$/i.test(j.image) ? j.image : "";
+        const x = j.links && typeof j.links.x === "string" && /^https:\/\/(x|twitter)\.com\/\w{1,30}\/?$/.test(j.links.x) ? j.links.x : "";
+        hit = { t: Date.now(), body: JSON.stringify({ image: img, x }), err: false };
+      }
+    } catch {}
+    if (FOBO_META.size > 5000) FOBO_META.clear();
+    FOBO_META.set(id, hit);
+  }
+  send(res, 200, hit.body, { "Content-Type": "application/json", "Cache-Control": hit.err ? "no-store" : "public, max-age=86400" });
+}
 async function ipfsImage(req, res, cid) {
   if (!CID_RE.test(cid)) return send(res, 400, "bad cid");
   let hit = imgCache.get(cid);
@@ -472,6 +495,8 @@ const server = http.createServer((req, res) => {
   if (urlPath === "/healthz") return send(res, 200, "ok", { "Content-Type": "text/plain" });
   if (urlPath === "/config.js") return send(res, 200, CONFIG_JS, { "Content-Type": TYPES[".js"], "Cache-Control": "no-store, max-age=0" });
   if (url.pathname.startsWith("/dp/")) return proxy(req, res, url.pathname.slice(3), url.search);
+  const fm = /^\/fobo-meta\/([0-9a-f]{8,64})$/.exec(urlPath);
+  if (fm) return foboMeta(req, res, fm[1]);
   if (url.pathname.startsWith("/img/ipfs/")) return ipfsImage(req, res, url.pathname.slice(10));
 
   // the app page gets link-preview tags; /t/<CA> is a shared token link with that token's name in the preview
