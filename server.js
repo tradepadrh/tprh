@@ -82,6 +82,7 @@ const TYPES = {
   ".ico": "image/x-icon",
   ".json": "application/json; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -489,7 +490,7 @@ const server = http.createServer((req, res) => {
       ...(isHtml ? { "Content-Security-Policy": CSP } : {}),
       "Content-Type": TYPES[ext] || "application/octet-stream",
       // the app is one HTML file: never let a browser or CDN keep an old copy after a deploy
-      "Cache-Control": isHtml || target.endsWith("config.js") ? "no-store, max-age=0" : "public, max-age=3600",
+      "Cache-Control": isHtml || target.endsWith("config.js") || target.endsWith("sw.js") || ext === ".webmanifest" ? "no-store, max-age=0" : "public, max-age=3600",
     });
     if (req.method === "HEAD") return res.end();
     fs.createReadStream(target).on("error", () => res.destroy()).pipe(res);
