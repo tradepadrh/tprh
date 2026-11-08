@@ -1419,7 +1419,7 @@ function renderSorts() {
   $("sorts").innerHTML = SORTS[S.src].map(([k, l]) => `<button role="tab" data-sort="${k}" aria-selected="${k === cur}">${l}</button>`).join("") + note +
     (S.src === "curve" || S.src === "grad" ? `<span class="sf"><button data-sf="safe" aria-pressed="${S.safeOnly === "safe"}" title="Hide copycats, big dev bags and serial launchers">${SHIELD} Hide risky</button><button data-sf="verified" aria-pressed="${S.safeOnly === "verified"}" title="Only tokens whose website or Telegram shows this contract address">${SHIELD_OK} CA verified</button></span>` : "") +
     (S.src === "curve" && CONFIG.SUBMIT ? `<button class="qb-set" data-verify title="Pons project? Ask for the Verified by TradePad badge">${SHIELD_OK} Get verified</button>` : "") +
-    (S.src === "fobo" ? `<button class="qb-set rd-btn fb" data-radar="fobo" title="Live fobo.fun launches with floor gap and launch tax"><svg viewBox="0 0 24 24" width="14" height="14"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/></g></svg>Fobo Radar</button>` : "") +
+    (S.src === "fobo" ? `<button class="qb-set rd-btn fb" data-radar="fobo" title="Live fobo.fun launches with floor gap and launch tax"><svg viewBox="0 0 24 24" width="14" height="14"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/></g></svg>Fobo Radar</button><button class="qb-set rd-btn fb" data-orbit title="3D map of every fobo.fun token around its floor"><svg viewBox="0 0 24 24" width="14" height="14"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-20 12 12)"/></g></svg>Orbit 3D</button>` : "") +
     (S.src === "curve" && phState(3) === "live" ? `<button class="qb-set rd-btn" data-radar title="Live launch feed, curve alerts and wallet tracking"><svg viewBox="0 0 24 24" width="14" height="14"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/></g></svg>Radar</button>` : "") +
     (S.src === "fobo" ? "" : `<button class="qb-set" id="qb-set" title="Amount for one-click buys">${BOLT} Quick buy <b>${esc(S.qb)} ETH</b></button>`);
   $("sorts").querySelectorAll("[data-sf]").forEach(b => b.onclick = () => { S.safeOnly = S.safeOnly === b.dataset.sf ? "" : b.dataset.sf; save("safe", S.safeOnly); renderTable(); });
@@ -2888,7 +2888,7 @@ const NVI = {
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>',
 };
 const CHEV = '<svg class="cv" viewBox="0 0 12 12"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const NV_LIVE = [["feed", "radar", "Pons Radar", "New Pons launches, live"], ["fobo", "radar", "Fobo Radar", "fobo.fun launches, floor and tax"], ["moving", "up", "Moving", "Curves climbing right now"], ["alerts", "bell", "Alerts", "50%, 80% and graduation"], ["wallets", "user", "Wallets", "Follow creator wallets"]];
+const NV_LIVE = [["feed", "radar", "Pons Radar", "New Pons launches, live"], ["fobo", "radar", "Fobo Radar", "fobo.fun launches, floor and tax"], ["orbit", "radar", "Fobo Orbit", "3D map of every fobo.fun token"], ["moving", "up", "Moving", "Curves climbing right now"], ["alerts", "bell", "Alerts", "50%, 80% and graduation"], ["wallets", "user", "Wallets", "Follow creator wallets"]];
 const NV_SOON = [["rocket", "Launch", "Start a Pons launch from TradePad"], ["bag", "Portfolio", "Every Pons bag and its PnL"], ["chain", "Multichain", "More chains, same TradePad"]];
 const tokenCA = () => /^0x[0-9a-fA-F]{40}$/.test(CONFIG.TOKEN_CA || "") ? CONFIG.TOKEN_CA : "";
 function navGo(k, tab) {
@@ -2896,6 +2896,7 @@ function navGo(k, tab) {
   if (k === "trade") return window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
   if (k === "radar") {
     if (tab === "fobo") return openRadar("fobo");
+    if (tab === "orbit") return openOrbit();
     if (tab) { rdSetSrc("pons"); RD.tab = tab; save("rdtab", tab); return openRadar("pons"); }
     return openRadar();
   }
@@ -2904,7 +2905,7 @@ function navGo(k, tab) {
 }
 function navPopHTML(menu) {
   return menu === "live"
-    ? NV_LIVE.map(([t, ic, n, d]) => `<button class="it" role="menuitem" data-nvt="${t}"><span class="ic">${NVI[ic]}</span><span><b>${n}</b><small>${d}</small></span>${t === "feed" ? "<em>LIVE</em>" : t === "fobo" ? '<em class="nw">NEW</em>' : ""}</button>`).join("")
+    ? NV_LIVE.map(([t, ic, n, d]) => `<button class="it" role="menuitem" data-nvt="${t}"><span class="ic">${NVI[ic]}</span><span><b>${n}</b><small>${d}</small></span>${t === "feed" ? "<em>LIVE</em>" : t === "fobo" || t === "orbit" ? '<em class="nw">NEW</em>' : ""}</button>`).join("")
     : NV_SOON.map(([ic, n, d]) => `<div class="it off" role="menuitem" aria-disabled="true"><span class="ic">${NVI[ic]}</span><span><b>${n}</b><small>${d}</small></span><em>SOON</em></div>`).join("");
 }
 function closeNavPop() { $("nv-pop").hidden = true; $("road").querySelectorAll("[aria-expanded]").forEach(b => b.setAttribute("aria-expanded", "false")); }
@@ -3485,6 +3486,155 @@ function sampleTf(id) { const r = rng("tf" + id); const o = {}; for (const [k, n
 function sampleTxs(seed) { const r = rng("tx" + seed); return Array.from({ length: 12 }, (_, i) => ({ id: "", created_at: new Date(Date.now() - i * 47e3 - r() * 3e4).toISOString(), amount_0: 0, amount_1: (r() * 2e5) | 0, price_1_usd: S.tokens[lc(S.sel.base.id)]?.price || 0.001 })); }
 
 // ======================= START =======================
+// ======================= FOBO ORBIT (3D map of fobo.fun tokens) =======================
+// Every token orbits the floor core: distance = how far price sits above its floor (log scale),
+// size = market cap, height = age. New launches flash in; tokens still in launch tax carry a shrinking ring.
+const ORB = { open: false, el: null, r: null, raf: 0, meshes: {}, hover: null, rotY: 0, rotX: 0.42, drag: null, zoom: 1 };
+const ORB_CSS = `
+#fo{position:fixed;inset:0;z-index:74;background:radial-gradient(1200px 800px at 60% 55%,#1a2406 0%,#070806 60%,#040403 100%);color:var(--cream,#F1E6D3);font-family:inherit;overflow:hidden}
+#fo canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+#fo canvas.dg{cursor:grabbing}
+#fo .fo-hud{position:absolute;left:24px;top:22px;pointer-events:none;max-width:min(420px,calc(100vw - 100px))}
+#fo .fo-t{font-weight:800;font-size:28px;letter-spacing:.02em;color:#CCFF04;display:flex;gap:10px;align-items:center}
+#fo .fo-t em{font-style:normal;font-size:11px;letter-spacing:.12em;border:1px solid #CCFF04;border-radius:99px;padding:3px 9px}
+#fo .fo-s{color:#9a958a;font-size:13px;margin-top:4px}
+#fo .fo-stats{display:flex;gap:22px;margin-top:16px}
+#fo .fo-stats b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+#fo .fo-stats span{font-size:11px;color:#9a958a;letter-spacing:.08em;text-transform:uppercase}
+#fo .fo-x{position:absolute;right:20px;top:20px;width:44px;height:44px;border-radius:99px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:inherit;font-size:20px;cursor:pointer}
+#fo .fo-leg{position:absolute;left:24px;bottom:22px;font-size:12px;color:#9a958a;display:flex;gap:16px;flex-wrap:wrap;pointer-events:none;max-width:calc(100vw - 48px)}
+#fo .fo-leg i{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;vertical-align:middle}
+#fo .fo-card{position:absolute;pointer-events:none;min-width:200px;padding:12px 14px;border-radius:14px;background:rgba(14,16,10,.86);border:1px solid rgba(204,255,4,.35);backdrop-filter:blur(8px);font-size:13px;transform:translate(14px,-50%);display:none;box-shadow:0 0 30px rgba(204,255,4,.12)}
+#fo .fo-card .h{display:flex;gap:9px;align-items:center;font-weight:800;font-size:15px;margin-bottom:6px}
+#fo .fo-card .r{display:flex;justify-content:space-between;gap:16px;color:#9a958a}
+#fo .fo-card .r b{color:#F1E6D3;font-weight:700}
+#fo .fo-card .k{margin-top:7px;font-size:11px;color:#CCFF04}
+#fo .fo-scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(204,255,4,.35),transparent);animation:foscan 5s linear infinite;pointer-events:none}
+@keyframes foscan{from{top:-2%}to{top:102%}}
+@media (max-width:640px){#fo .fo-t{font-size:22px}#fo .fo-stats{gap:16px}#fo .fo-stats b{font-size:18px}#fo .fo-leg{bottom:14px;font-size:11px;gap:10px}}
+@media (prefers-reduced-motion:reduce){#fo .fo-scan{display:none}}`;
+const orbRadius = (F) => { const g = Number.isFinite(F.gap) ? Math.max(1, F.gap) : 1.5; return 3 + Math.min(10, Math.log(g) / Math.log(1.035)); };
+const orbAngle = (F) => (parseInt(F.id.slice(2, 10), 16) % 3600) / 3600 * Math.PI * 2;
+function orbBuild() {
+  const st = document.createElement("style"); st.textContent = ORB_CSS; document.head.appendChild(st);
+  const el = document.createElement("div"); el.id = "fo"; el.hidden = true; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Fobo Orbit");
+  el.innerHTML = `<div class="fo-scan"></div><canvas></canvas>
+  <div class="fo-hud"><div class="fo-t">FOBO ORBIT <em>BETA</em></div><div class="fo-s">Every fobo.fun token around its floor. Closer to the core = closer to the floor.</div>
+  <div class="fo-stats"><div><b id="fo-n">0</b><span>tokens</span></div><div><b id="fo-near">0</b><span>near floor</span></div><div><b id="fo-tax">0</b><span>in tax</span></div><div><b id="fo-new">0</b><span>last hour</span></div></div></div>
+  <button class="fo-x" aria-label="Close">✕</button>
+  <div class="fo-leg"><span><i style="background:#CCFF04"></i>near floor (&lt;1.05×)</span><span><i style="background:#7CC8FF"></i>launch tax live</span><span><i style="background:#F1E6D3"></i>above floor</span><span>size = market cap · drag to rotate · scroll to zoom · click to open</span></div>
+  <div class="fo-card"></div>`;
+  document.body.appendChild(el); ORB.el = el;
+  el.querySelector(".fo-x").onclick = closeOrbit;
+  const cv = el.querySelector("canvas");
+  let R; try { R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch { R = null; }
+  if (!R) { el.querySelector(".fo-s").textContent = "3D is not available in this browser."; return; }
+  R.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(50, 1, 0.1, 200), world = new THREE.Group(); scene.add(world);
+  // floor core + rings at 1.05x, 1.25x, 1.5x, 2x, 3x
+  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1), new THREE.MeshBasicMaterial({ color: 0xCCFF04, wireframe: true, transparent: true, opacity: .55 }));
+  const coreIn = new THREE.Mesh(new THREE.SphereGeometry(.8, 24, 16), new THREE.MeshBasicMaterial({ color: 0xCCFF04, transparent: true, opacity: .18 }));
+  world.add(core, coreIn);
+  for (const g of [1.05, 1.25, 1.5, 2, 3]) {
+    const r = 3 + Math.min(10, Math.log(g) / Math.log(1.035)), pts = [];
+    for (let i = 0; i <= 128; i++) { const a = i / 128 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)); }
+    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: g === 1.05 ? 0xCCFF04 : 0x55603a, transparent: true, opacity: g === 1.05 ? .55 : .35 })));
+  }
+  // star dust
+  const N = 900, sp = new Float32Array(N * 3); for (let i = 0; i < N * 3; i++) sp[i] = (Math.random() - .5) * 120;
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(sp, 3));
+  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0x8a9466, size: .12, transparent: true, opacity: .6 })));
+  ORB.r = { R, scene, cam, world, core, coreIn, ray: new THREE.Raycaster(), mouse: new THREE.Vector2(-9, -9), mx: 0, my: 0 };
+  const size = () => { const w = el.clientWidth, h = el.clientHeight; R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
+  ORB.r.size = size; addEventListener("resize", () => ORB.open && size());
+  cv.addEventListener("pointerdown", (e) => { ORB.drag = { x: e.clientX, y: e.clientY, ry: ORB.rotY, rx: ORB.rotX, moved: 0 }; cv.classList.add("dg"); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", (e) => {
+    const b = cv.getBoundingClientRect(); ORB.r.mx = e.clientX - b.left; ORB.r.my = e.clientY - b.top;
+    ORB.r.mouse.set(ORB.r.mx / b.width * 2 - 1, -(ORB.r.my / b.height) * 2 + 1);
+    if (ORB.drag) { const dx = e.clientX - ORB.drag.x, dy = e.clientY - ORB.drag.y; ORB.drag.moved = Math.max(ORB.drag.moved, Math.abs(dx) + Math.abs(dy));
+      ORB.rotY = ORB.drag.ry + dx * .006; ORB.rotX = Math.max(.05, Math.min(1.35, ORB.drag.rx + dy * .004)); }
+  });
+  const up = () => { cv.classList.remove("dg"); const d = ORB.drag; ORB.drag = null; if (d && d.moved < 6 && ORB.hover) openFobo(ORB.hover); };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", () => { ORB.drag = null; cv.classList.remove("dg"); });
+  cv.addEventListener("pointerleave", () => ORB.r.mouse.set(-9, -9));
+  cv.addEventListener("wheel", (e) => { e.preventDefault(); ORB.zoom = Math.max(.45, Math.min(2.2, ORB.zoom * (e.deltaY > 0 ? 1.08 : .93))); }, { passive: false });
+}
+function orbSync() {
+  if (!ORB.r) return;
+  const { world } = ORB.r, rows = FOBO.list.slice(0, FOBO_ROWS), seen = new Set(), now = Date.now() / 1000;
+  let near = 0, tax = 0, fresh = 0;
+  for (const F of rows) {
+    seen.add(F.id);
+    const inTax = foboTaxLeft(F) > 0, isNear = Number.isFinite(F.gap) && F.gap < 1.05;
+    if (inTax) tax++; if (isNear) near++; if (F.launchedAt && now - F.launchedAt < 3600) fresh++;
+    let m = ORB.meshes[F.id];
+    if (!m) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: 0xF1E6D3 }));
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(1.7, 16, 12), new THREE.MeshBasicMaterial({ color: 0xF1E6D3, transparent: true, opacity: .14, depthWrite: false }));
+      const ringPts = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2; ringPts.push(new THREE.Vector3(Math.cos(a), Math.sin(a), 0)); }
+      const ring = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ringPts), new THREE.LineBasicMaterial({ color: 0x7CC8FF, transparent: true, opacity: .9 }));
+      g.add(body, halo, ring); body.userData.id = F.id; world.add(g);
+      m = ORB.meshes[F.id] = { g, body, halo, ring, born: performance.now(), a: orbAngle(F) };
+    }
+    m.F = F; m.r = orbRadius(F);
+    m.y = F.launchedAt ? Math.max(-2.5, Math.min(2.5, 2.5 - (now - F.launchedAt) / 3600 * 0.6)) : 0;
+    m.s = Number.isFinite(F.mcap) && F.mcap > 0 ? Math.max(.12, Math.min(.5, Math.log10(F.mcap) * .075 - .05)) : .14;
+    const col = inTax ? 0x7CC8FF : isNear ? 0xCCFF04 : 0xF1E6D3;
+    m.body.material.color.setHex(col); m.halo.material.color.setHex(col); m.ring.visible = inTax;
+  }
+  for (const id of Object.keys(ORB.meshes)) if (!seen.has(id)) { world.remove(ORB.meshes[id].g); delete ORB.meshes[id]; }
+  const q = (i, v) => { const e = document.getElementById(i); if (e) e.textContent = v; };
+  q("fo-n", rows.length); q("fo-near", near); q("fo-tax", tax); q("fo-new", fresh);
+}
+function orbCard() {
+  const card = ORB.el.querySelector(".fo-card"), m = ORB.hover && ORB.meshes[ORB.hover];
+  if (!m) { card.style.display = "none"; return; }
+  const F = m.F, q = foboQuote(F.quote), t = foboTaxLeft(F);
+  card.innerHTML = `<div class="h">${avHTML(F.symbol, F.id)}${esc(F.symbol)} <span style="color:#9a958a;font-weight:600">/ ${esc(q.sym)}</span></div>
+    <div class="r">Market cap <b>${Number.isFinite(F.mcap) ? fmtUsd(F.mcap) : "—"}</b></div>
+    <div class="r">Floor gap <b>${Number.isFinite(F.gap) ? (F.gap < 1.005 ? "at floor" : F.gap.toFixed(2) + "×") : "—"}</b></div>
+    <div class="r">Launched <b>${foboAge(F)}</b></div>${t > 0 ? `<div class="r">Launch tax <b style="color:#7CC8FF">${Math.ceil(t)}s left</b></div>` : ""}
+    <div class="k">Click to open</div>`;
+  card.style.left = ORB.r.mx + "px"; card.style.top = ORB.r.my + "px"; card.style.display = "block";
+}
+function orbLoop() {
+  if (!ORB.open || !ORB.r) return;
+  ORB.raf = requestAnimationFrame(orbLoop);
+  const { R, scene, cam, world, core, coreIn, ray, mouse } = ORB.r, t = performance.now() / 1000;
+  if (!ORB.drag && !REDUCED) ORB.rotY += .0012;
+  const d = 26 * ORB.zoom * (cam.aspect < 1 ? 1.25 / Math.max(.45, cam.aspect) : 1); cam.position.set(0, Math.sin(ORB.rotX) * d, Math.cos(ORB.rotX) * d); cam.lookAt(0, 0, 0);
+  world.rotation.y = ORB.rotY; core.rotation.y = t * .3; core.rotation.x = t * .17; coreIn.scale.setScalar(1 + Math.sin(t * 2) * .06);
+  for (const m of Object.values(ORB.meshes)) {
+    const a = m.a + t * (0.05 / Math.max(1, m.r * .35)), age = (performance.now() - m.born) / 1000, intro = Math.min(1, age / 1.2);
+    m.g.position.set(Math.cos(a) * m.r, m.y * intro, Math.sin(a) * m.r);
+    const pulse = m.F.launchedAt && Date.now() / 1000 - m.F.launchedAt < 600 ? 1 + Math.sin(t * 5) * .18 : 1;
+    const hov = ORB.hover === m.F.id ? 1.35 : 1;
+    m.body.scale.setScalar(m.s * intro * hov); m.halo.scale.setScalar(m.s * intro * hov * pulse); m.halo.material.opacity = .1 + (pulse - 1) * .6 + (hov > 1 ? .12 : 0);
+    if (m.ring.visible) { const k = Math.max(.15, foboTaxLeft(m.F) / FOBO_TAX_S); m.ring.scale.setScalar(m.s * (1.4 + 2.2 * k)); m.ring.lookAt(cam.position); }
+  }
+  ray.setFromCamera(mouse, cam);
+  const hit = ray.intersectObjects(Object.values(ORB.meshes).map(m => m.body))[0];
+  const id = hit ? hit.object.userData.id : null;
+  if (id !== ORB.hover || id) { ORB.hover = id; orbCard(); }
+  R.render(scene, cam);
+}
+async function openOrbit() {
+  closeNavPop?.();
+  if (!ORB.el) orbBuild();
+  ORB.el.hidden = false; ORB.open = true; document.body.classList.add("noscroll");
+  if (ORB.r) { ORB.r.size(); cancelAnimationFrame(ORB.raf); orbLoop(); }
+  await loadFobo().catch(() => {}); orbSync();
+}
+function closeOrbit() {
+  if (!ORB.el) return; ORB.el.hidden = true; ORB.open = false; cancelAnimationFrame(ORB.raf);
+  if ($("tm").hidden && !RD.open && $("fb").hidden) document.body.classList.remove("noscroll");
+}
+setInterval(() => { if (ORB.open && !document.hidden) loadFobo(true).then(orbSync).catch(() => {}); }, 10000);
+setInterval(() => { if (ORB.open) orbSync(); }, 1000);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ORB.open && $("fb").hidden) closeOrbit(); }, true);
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-orbit]"); if (b) { e.preventDefault(); openOrbit(); } });
+
 // ======================= EFFECTS: GSAP + THREE.JS =======================
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function flash(el, up) { if (REDUCED || !el) return; el.classList.remove("flash-up", "flash-down"); void el.offsetWidth; el.classList.add(up ? "flash-up" : "flash-down"); }
