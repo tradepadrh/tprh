@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%20width%3D%22512%22%20height%3D%22512%22%20role%3D%22img%22%20aria-label%3D%22TP%20app%20icon%22%3E%0A%20%20%3Ctitle%3ETP%20app%20icon%3C/title%3E%0A%20%20%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%23141414%22/%3E%0A%20%20%3Cg%20transform%3D%22translate%28256%20256%29%20scale%282.6%29%20translate%28-88%20-94%29%22%3E%0A%20%20%20%20%3Cpath%20fill%3D%22%23CCFF04%22%20d%3D%22M44%2041%20H150%20C158%2041%20164.5%2047%20164.5%2055%20V61.5%20L130.5%20115.5%20C128.5%20118.5%20125.5%20119.5%20122%20119.5%20H92.5%20L76.5%20147%20H53%20L82%20101%20H115.5%20L140%2061.5%20H32.5%20Z%22/%3E%0A%20%20%20%20%3Cpath%20fill%3D%22%23CCFF04%22%20d%3D%22M25%2071%20H122%20L109.5%2091.5%20H73.5%20L39.5%20147%20H16.5%20L51%2091.5%20H12.5%20Z%22/%3E%0A%20%20%3C/g%3E%0A%3C/svg%3E%0A">
 <title>TradePad</title>
+<!--META-->
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -982,7 +983,7 @@ th.r, td.r { text-align: right; }
     <div class="msg" id="rm-s"></div>
   </div>
 </div>
-<script src="config.js"></script>
+<script src="/config.js"></script>
 <script>
 (() => {
 "use strict";
@@ -2734,7 +2735,7 @@ async function openProjectTrade(ca) {
 }
 // shared links: tradepad.dev/#t=0x… opens that token in the chart
 async function openTokenLink() {
-  const m = /^#t=(0x[0-9a-fA-F]{40})$/.exec(location.hash); if (!m) return;
+  const m = /^#t=(0x[0-9a-fA-F]{40})$/.exec(location.hash) || /^\/t\/(0x[0-9a-fA-F]{40})\/?$/.exec(location.pathname); if (!m) return;
   const pool = await poolForCA(lc(m[1]));
   if (!pool) return showMsg("This token has no pool yet.", "err");
   selectPool(pool); jump("c-chart");
@@ -3052,7 +3053,7 @@ function closeTrade() {
   if (chartHome) chartHome.parentNode.insertBefore($("c-chart"), chartHome.nextSibling);
 }
 const SHARE_I = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>';
-const tokenLink = (id) => `${(CONFIG.SITE_URL || location.origin).replace(/\/$/, "")}/#t=${id}`;
+const tokenLink = (id) => `${(CONFIG.SITE_URL || location.origin).replace(/\/$/, "")}/t/${id}`;
 async function shareToken(id, el) { const html = el.innerHTML; await copy(tokenLink(id), el, "Copied"); setTimeout(() => { el.innerHTML = html; }, 1900); }
 $("tm-head").addEventListener("click", (e) => {
   const id = S.sel?.base?.id; if (!id) return;

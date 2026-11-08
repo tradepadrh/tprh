@@ -354,6 +354,53 @@ async function ponsLaunch(ca) {   // factory.getLaunchedToken(ca): exists, deplo
     return { exists: BigInt("0x" + w[14]) !== 0n, deployer: "0x" + w[2].slice(24), phase: Number(BigInt("0x" + w[10])) };
   } catch { return null; }
 }
+// ---- link previews (X, Telegram, Discord read these tags; the #t= part of a URL never reaches the server, /t/<CA> does)
+const tokMeta = new Map();                          // ca -> { at, name, symbol }
+function abiString(hex) {
+  try { const h = String(hex || "").slice(2); if (h.length < 128) return ""; const len = Number(BigInt("0x" + h.slice(64, 128))); if (len > 64) return "";
+    return Buffer.from(h.slice(128, 128 + len * 2), "hex").toString("utf8").replace(/[\u0000-\u001f]/g, "").trim(); } catch { return ""; }
+}
+async function tokenInfo(ca) {
+  const hit = tokMeta.get(ca); if (hit && Date.now() - hit.at < 3600e3) return hit;
+  const call = (data, id) => ({ jsonrpc: "2.0", id, method: "eth_call", params: [{ to: ca, data }, "latest"] });
+  const timeout = new Promise((r) => setTimeout(() => r(null), 2500));
+  const r = await Promise.race([rpcUpstream(JSON.stringify([call("0x06fdde03", 1), call("0x95d89b41", 2)])), timeout]);
+  let name = "", symbol = "";
+  try { const arr = JSON.parse(r.body.toString("utf8")); for (const x of arr) { if (x.id === 1) name = abiString(x.result); if (x.id === 2) symbol = abiString(x.result); } } catch {}
+  const v = { at: Date.now(), name: name.slice(0, 48), symbol: symbol.slice(0, 16) };
+  if (tokMeta.size > 2000) tokMeta.clear();
+  if (symbol) tokMeta.set(ca, v);
+  return v;
+}
+const htmlEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+async function appPage(req, res, ca) {
+  let html;
+  try { html = await fs.promises.readFile(path.join(ROOT, "index.html"), "utf8"); } catch { return send(res, 500, "Server error"); }
+  const host = String(req.headers.host || "").toLowerCase();
+  const origin = SITE ? SITE.origin : /^[a-z0-9.-]+(:\d+)?$/.test(host) ? `${req.headers["x-forwarded-proto"] === "http" ? "http" : "https"}://${host}` : "";
+  let title = "TradePad · Native DEX on Robinhood Chain";
+  let desc = "Trade Pons launches and Uniswap pairs on Robinhood Chain. Radar alerts, one-tap buys, safety checks. Your wallet confirms every trade.";
+  let url = origin + "/";
+  if (ca) {
+    const t = await tokenInfo(ca);
+    if (t.symbol) { title = `${t.symbol}${t.name && t.name !== t.symbol ? " (" + t.name + ")" : ""} · Trade on TradePad`; desc = `Chart, safety checks and one-tap buy for ${t.symbol} on Robinhood Chain. CA ${ca}`; }
+    else desc = `Open token ${ca} on TradePad: chart, safety checks and one-tap buy on Robinhood Chain.`;
+    url = origin + "/t/" + ca;
+  }
+  const img = origin + "/og.png";
+  const meta = [
+    `<meta name="description" content="${htmlEsc(desc)}">`,
+    `<meta property="og:type" content="website">`, `<meta property="og:site_name" content="TradePad">`,
+    `<meta property="og:title" content="${htmlEsc(title)}">`, `<meta property="og:description" content="${htmlEsc(desc)}">`,
+    origin ? `<meta property="og:url" content="${htmlEsc(url)}">` : "",
+    origin ? `<meta property="og:image" content="${htmlEsc(img)}">` : "", `<meta property="og:image:width" content="1200">`, `<meta property="og:image:height" content="630">`,
+    `<meta name="twitter:card" content="summary_large_image">`, `<meta name="twitter:title" content="${htmlEsc(title)}">`, `<meta name="twitter:description" content="${htmlEsc(desc)}">`,
+    origin ? `<meta name="twitter:image" content="${htmlEsc(img)}">` : "",
+  ].filter(Boolean).join("\n");
+  const body = html.replace("<!--META-->", meta);
+  res.writeHead(200, { ...SECURITY_HEADERS, "Content-Security-Policy": CSP, "Content-Type": TYPES[".html"], "Cache-Control": "no-store, max-age=0" });
+  res.end(req.method === "HEAD" ? undefined : body);
+}
 function submitRoute(req, res) {
   const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
   const now = Date.now(), day = new Date().toISOString().slice(0, 10);
@@ -426,6 +473,9 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith("/dp/")) return proxy(req, res, url.pathname.slice(3), url.search);
   if (url.pathname.startsWith("/img/ipfs/")) return ipfsImage(req, res, url.pathname.slice(10));
 
+  // the app page gets link-preview tags; /t/<CA> is a shared token link with that token's name in the preview
+  const tok = /^\/t\/(0x[0-9a-fA-F]{40})\/?$/.exec(urlPath);
+  if (urlPath === "/" || urlPath === "/index.html" || tok) return appPage(req, res, tok ? tok[1].toLowerCase() : "");
   if (urlPath.endsWith("/")) urlPath += "index.html";
   const file = path.normalize(path.join(ROOT, urlPath));
   if (!file.startsWith(ROOT + path.sep)) return send(res, 403, "Forbidden");
